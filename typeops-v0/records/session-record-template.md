@@ -1,41 +1,30 @@
 # Registro de sesión TypeOps V0
 
-**Sesión:** ____ **Fecha:** ____ **Inicio/fin:** ____ **Duración total aproximada:** ____  
-**Objetivo de hoy:** ____
+**Sesión:** ____ **Fecha:** ____  
+**Inicio:** ____ **Final:** ____ **Tiempo total:** ____  
+**Tiempo aproximado de registro:** ____  
+**Bloqueo excepcional, opcional:** actividad ____; motivo ____
 
 ## Actividades
 
-| ID | Respuesta original breve o enlace | Resultado | Confianza | Pistas | Error causal | Min | Verificación | Mecánico |
-|---|---|---|---|---:|---|---:|---|---|
-|  |  | C / P / I | B / M / A | 0 |  |  | S / I | — |
-|  |  | C / P / I | B / M / A | 0 |  |  | S / I | — |
-|  |  | C / P / I | B / M / A | 0 |  |  | S / I | — |
-|  |  | C / P / I | B / M / A | 0 |  |  | S / I | — |
-|  |  | C / P / I | B / M / A | 0 |  |  | S / I | — |
+### Completa el usuario
 
-`C/P/I` = correcto/parcial/incorrecto. `B/M/A` = confianza baja/media/alta. `S/I` = verificación suficiente/insuficiente.
+| ID | Respuesta original o enlace | Confianza | Pista utilizada | Comentario opcional | Fricción al escribir, opcional |
+|---|---|---|---|---|---|
+|  |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción breve |
+|  |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción breve |
+|  |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción breve |
+|  |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción breve |
+|  |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción breve |
 
-## Cierre de dos minutos
+Ejemplos de fricción: símbolos difíciles, muchos errores o correcciones, comando difícil de escribir o problemas de edición. No infieras fricción cuando no fue reportada.
 
-- **Un aprendizaje recuperable:**
-- **Un error causal dominante:**
-- **Una evidencia que omití o usé bien:**
-- **Próxima actividad/variante:**
-- **Práctica externa siguiente:**
-- **Overhead de registro:** ____ min (objetivo: menos de 5).
+### Completa posteriormente una IA
 
-## Selección manual de la próxima actividad
-
-Elegí una sola regla:
-
-- concepto errado → explicación breve + variante posterior;
-- recuperación incompleta → un reintento + repaso próximo;
-- acción sin evidencia → F2/F4 de siguiente acción/verificación;
-- sintaxis → reconstrucción contextual breve;
-- pista → variante posterior sin pista;
-- confianza alta incorrecta → contraste del concepto confundido;
-- fricción mecánica → fragmento técnico completo, máximo 2–3 min;
-- resultado independiente → avanzar sin repetir.
-
-**Decisión aplicada:** ____ **Por qué:** ____
-
+| ID | Evaluación | Error causal | Verificación | Feedback breve | Próxima recomendación |
+|---|---|---|---|---|---|
+|  | correcto / parcial / incorrecto |  | suficiente / insuficiente / N/A |  |  |
+|  |  |  |  |  |  |
+|  |  |  |  |  |  |
+|  |  |  |  |  |  |
+|  |  |  |  |  |  |

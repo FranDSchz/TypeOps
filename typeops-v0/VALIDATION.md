@@ -2,6 +2,15 @@
 
 Fecha: 31 de julio de 2026.
 
+## Revisión posterior al primer piloto
+
+- Las seis sesiones usan `Tarea`, `Formato de respuesta` y `Extensión máxima`; ya no contienen `Consigna` ni `Producí`.
+- La sesión 1 separa dificultad conceptual, extensión, fricción administrativa y fricción al escribir. Un total de 25 minutos por respuestas largas no se clasifica automáticamente como dificultad conceptual.
+- F1-02 conserva la distinción hecho/hipótesis/resultado, ahora dentro de un canal competitivo y vinculada a decisiones prematuras.
+- F2-01 solicita una sola acción, evidencia exacta y hasta dos condicionales inmediatos.
+- El usuario no se autoevalúa ni estima tiempos por actividad. Las plantillas reservan claramente los campos de evaluación para una IA posterior.
+- `records/AI_EVALUATION_PROMPT.md` recibe sesión, clave, respuestas y registro; obliga a usar sólo la rúbrica, aceptar equivalencias y no inventar criterios.
+
 ## Comprobaciones estructurales
 
 - `activities.json` parsea como JSON y contiene 24 IDs primarios únicos.
@@ -14,14 +23,14 @@ Fecha: 31 de julio de 2026.
 
 ## Distribución comprobada
 
-| Sesión | Actividades | Tiempo de actividades | Cierre | Total previsto |
-|---|---|---:|---:|---:|
-| 1 | F1-01, F1-02, F1-03, F2-01, F4-06 | 12 min | 2 min + lectura breve | 14–17 min |
-| 2 | F3-01, F3-02, F3-03, F2-02, F4-01 | 15 min | 2 min | 17 min |
-| 3 | F1-04, F2-03, F3-04, F2-04, F4-05 | 14 min | 2 min | 16 min |
-| 4 | F1-05, F1-06, F3-05, reaparición F2-04 | 14 min | 2 min | 16 min |
-| 5 | F2-05, F4-02, F4-03, F4-06, variante F4-02V | 14 min | 2 min | 16 min |
-| 6 | F3-06, F2-06, F4-04, F4-05 | 14 min | 2 min | 16 min |
+| Sesión | Actividades |
+|---|---|
+| 1 | F1-01, F1-02, F1-03, F2-01, F4-06 |
+| 2 | F3-01, F3-02, F3-03, F2-02, F4-01 |
+| 3 | F1-04, F2-03, F3-04, F2-04, F4-05 |
+| 4 | F1-05, F1-06, F3-05, reaparición F2-04 |
+| 5 | F2-05, F4-02, F4-03, F4-06, variante F4-02V |
+| 6 | F3-06, F2-06, F4-04, F4-05 |
 
 Las 24 actividades primarias son únicas en el corpus. F2-04, F4-05, F4-06 reaparecen deliberadamente en otra superficie; F4-02V es una variante, no una actividad primaria adicional.
 
@@ -44,18 +53,18 @@ Las 24 actividades primarias son únicas en el corpus. F2-04, F4-05, F4-06 reapa
 
 ## Registro y carga operativa
 
-- El registro por actividad usa una fila y un solo error causal dominante.
-- El cierre está limitado a dos minutos y el overhead objetivo total a menos de cinco minutos.
-- No se registra WPM. La fricción mecánica sólo importa si cambia el resultado y su práctica adicional está limitada a dos o tres minutos.
+- El usuario registra sólo respuesta original, confianza, pista, comentario opcional y fricción al escribir cuando exista.
+- Una IA completa después evaluación, error causal, verificación, feedback breve y próxima recomendación usando la clave separada.
+- Sólo se registran inicio, final, tiempo total, tiempo aproximado de registro y bloqueo excepcional opcional; no hay estimaciones por actividad.
+- No se registra WPM. La fricción al escribir no se infiere cuando el usuario no la reporta.
 
 ## Revisión técnica manual
 
 - Se revisaron sintaxis y propósito de `pwd`, `ls`, `cd`, `cat`, `less`, `head`, `tail`, `grep`, `find`, pipes, redirección conceptual, `ps`, `ss`, `systemctl status`, `curl` y el fragmento Python.
 - Las soluciones equivalentes son aceptadas por criterio semántico, no por coincidencia textual.
-- Las duraciones suman entre 14 y 17 minutos incluyendo cierre y lectura breve, dentro del rango pedido de 12–18 minutos.
+- Cada actividad visible declara `Tarea`, `Formato de respuesta` y `Extensión máxima`; el tiempo total no se usa como sustituto de dificultad conceptual.
 - No se ejecutaron pruebas automatizadas porque no existe software; sí se hicieron parseo de JSON, conteos, cobertura de IDs, resolución de referencias y búsqueda de patrones inseguros.
 
 ## Corrección de alcance registrada
 
 El plan preliminar repetía F1-06 en sesión 5 y no ubicaba F4-03. Se sustituyó esa repetición por F4-03, sin aumentar el número de actividades, familias, sesiones ni temas.
-

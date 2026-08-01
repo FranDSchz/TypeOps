@@ -4,18 +4,18 @@
 **Prerrequisitos:** ninguno. **Duración:** 15–17 min. **Materiales:** este archivo, papel/editor y una copia del registro de sesión.  
 **No consultar:** Internet, IA, clave de respuestas antes del intento.  
 **Sí consultar:** únicamente los modelos y ejemplos de esta página; después del intento, las pistas de `../answer-keys/session-01-key.md`.  
-**Cronómetro opcional:** iniciá uno de 17 min; no lo uses para apurarte ni calcular WPM.
+**Tiempo:** registrá sólo inicio, final, total y tiempo aproximado de registro; no estimes minutos por actividad.
 
 ## Instrucciones exactas
 
 1. Leé cada modelo y ejemplo; son enseñanza, no pistas ocultas.
-2. Respondé con tus palabras. Anotá al final `Confianza: baja/media/alta`.
+2. Respondé con tus palabras y respetá la extensión máxima. Anotá `Confianza: baja/media/alta` en el registro.
 3. Si no podés avanzar en 45 segundos, escribí `Pido pista 1`, registralo y leé sólo la pista de esa actividad.
-4. Tras las cinco actividades, abrí la clave, evaluá y completá el cierre. No corrijas silenciosamente tu respuesta original.
+4. Tras las cinco actividades, conservá las respuestas originales. No te autoevalúes: una IA lo hará después con la sesión, la clave y el registro.
 
 > **Modelo estándar, no regla oficial de Cyber War:** en muchos Attack/Defense, los equipos protegen servicios propios, intentan obtener flags o evidencia en rivales y deben conservar función/disponibilidad. Checkers, ticks, SLA, flags y scoring concretos de Cyber War 2026 siguen sin confirmar.
 
-## 1. F1-01 — Ataque, defensa y función (2 min)
+## 1. F1-01 — Ataque, defensa y función
 
 **Familia:** F1 Modelo mental · **Objetivo:** distinguir tres objetivos · **Prerrequisitos:** ninguno · **Herramientas:** modelo anterior · **Ayuda:** pista 1.
 
@@ -23,23 +23,23 @@
 **Ejemplo:** bloquear una ruta vulnerable puede defender; si rompe el login, perjudica la función.
 
 **Contexto:** un integrante propone apagar el servicio ficticio de perfiles para que nadie lo ataque.  
-**Consigna:** explicá en tres líneas qué persiguen ataque, defensa y disponibilidad, y por qué apagar el servicio no es una defensa completa.  
-**Producí:** tres líneas conceptuales y una consecuencia verificable. **Pista:** disponible.  
-**Registro:** resultado, confianza, pista y error causal dominante.
+**Tarea:** distinguí qué persiguen ataque, defensa y disponibilidad, y explicá por qué apagar el servicio no es una defensa completa sin especular sobre scoring.  
+**Formato de respuesta:** tres viñetas — Ataque / Defensa / Disponibilidad y consecuencia.  
+**Extensión máxima:** tres viñetas, una oración por viñeta. **Pista:** disponible.
 
-## 2. F1-02 — Hecho, hipótesis y resultado (2 min)
+## 2. F1-02 — Hecho, hipótesis y resultado en el canal del equipo
 
 **Familia:** F1 · **Objetivo:** separar certeza, supuesto y observación · **Prerrequisitos:** F1-01 · **Herramientas:** ficha siguiente · **Ayuda:** pista 1.
 
 **Modelo mínimo:** hecho = confirmado por fuente válida; hipótesis = explicación o regla posible; resultado = observación de una prueba concreta.  
-**Ejemplo:** “será presencial” es hecho informado; “ticks de 60 s” es hipótesis; “curl devolvió 200 a las 14:05” es resultado.
+**Ejemplo:** en un handoff, “curl devolvió 200 a las 14:05” es un resultado; “la base está caída” sigue siendo hipótesis hasta comprobarla.
 
-**Contexto:** Cyber War será Attack/Defense, pero falta el reglamento detallado.  
-**Consigna:** clasificá y justificá: A) duración preliminar 90–120 min; B) habrá penalización SLA por cada tick; C) una comprobación local devolvió HTTP 503.  
-**Producí:** clasificación A/B/C y una frase de justificación por elemento. **Pista:** disponible.  
-**Registro:** señalá si confundiste información preliminar con regla confirmada.
+**Contexto:** durante la competencia aparecen estos mensajes: A) “La duración comunicada es preliminar: 90–120 min”; B) “Alguien dijo que cada tick penaliza SLA”, sin reglamento; C) “`/health` devolvió 503; la IA afirma que la base de datos está caída”.  
+**Tarea:** para A, B y C, indicá qué está respaldado, qué sigue siendo preliminar o hipótesis y qué decisión prematura evitarías.  
+**Formato de respuesta:** tres viñetas `A/B/C: estado de evidencia → decisión que no tomaría todavía`.  
+**Extensión máxima:** tres viñetas, una línea cada una. **Pista:** disponible.
 
-## 3. F1-03 — Capas de funcionamiento (3 min)
+## 3. F1-03 — Capas de funcionamiento
 
 **Familia:** F1 · **Objetivo:** distinguir proceso, puerto, servicio y checker · **Prerrequisitos:** F1-01 · **Herramientas:** modelo · **Ayuda:** dos pistas.
 
@@ -47,11 +47,11 @@
 **Ejemplo:** proceso y puerto pueden existir mientras `/login` devuelve 500.
 
 **Contexto:** `api-demo` aparece en procesos y 127.0.0.1:8080 escucha; todavía no hubo petición.  
-**Consigna:** indicá qué sabemos, qué no sabemos y cuál es la próxima comprobación segura.  
-**Producí:** hecho, límite de evidencia y comprobación funcional. **Pistas:** disponibles.  
-**Registro:** marcá si trataste proceso o puerto como prueba suficiente.
+**Tarea:** indicá qué está demostrado, qué no y cuál es la próxima comprobación funcional segura.  
+**Formato de respuesta:** tres líneas `Sabemos / No sabemos / Comprobaría`.  
+**Extensión máxima:** tres líneas. **Pistas:** disponibles.
 
-## 4. F2-01 — “El servicio está caído” (3 min)
+## 4. F2-01 — “El servicio está caído”
 
 **Familia:** F2 Siguiente acción segura · **Objetivo:** observar antes de modificar · **Prerrequisitos:** F1-03 · **Herramientas:** comando mostrado · **Ayuda:** dos pistas.
 
@@ -59,11 +59,11 @@
 **Ejemplo:** `curl -i http://127.0.0.1:8080/health` produce status, headers y body sin reiniciar nada.
 
 **Contexto:** un compañero dice “el servicio de perfiles está caído”, sin salida ni hora.  
-**Consigna:** escribí la primera acción segura, qué evidencia esperás y qué harías sólo después de verla.  
-**Producí:** acción + evidencia + decisión condicional. **Pistas:** disponibles.  
-**Registro:** marcá cualquier reinicio o parche propuesto sin observar.
+**Tarea:** indicá únicamente la primera acción segura, la evidencia exacta que registrarías y una o dos decisiones inmediatas condicionadas al resultado. No desarrolles un plan posterior.  
+**Formato de respuesta:** `Acción:` una; `Registrar:` hora, conexión/error, status y elementos relevantes de headers/body; `Si... entonces...:` una o dos.  
+**Extensión máxima:** cuatro líneas; una acción y hasta dos condicionales. **Pistas:** disponibles.
 
-## 5. F4-06 — Cierre con señales distintas (2 min)
+## 5. F4-06 — Cierre con señales distintas
 
 **Familia:** F4 Verificación y comunicación · **Objetivo:** comunicar incertidumbre · **Prerrequisitos:** F1-02/F1-03 · **Herramientas:** notas · **Ayuda:** pista 1.
 
@@ -71,22 +71,22 @@
 **Ejemplo:** hecho: puerto abierto; hecho: `/health`=503; hipótesis: dependencia; próxima prueba: correlacionar el log.
 
 **Contexto:** proceso y puerto existen, pero `/health` devuelve 503.  
-**Consigna:** redactá máximo cuatro líneas con hechos, hipótesis, estado funcional y próxima acción.  
-**Producí:** handoff breve y verificable. **Pista:** disponible.  
-**Registro:** marcá si presentaste una hipótesis como hecho.
+**Tarea:** redactá un handoff que limite la conclusión al alcance de `/health`, separe hechos e hipótesis y deje una próxima acción.  
+**Formato de respuesta:** cuatro líneas `Hechos / Hipótesis / Alcance funcional / Próxima acción`.  
+**Extensión máxima:** cuatro líneas. **Pista:** disponible.
 
-## Cierre (2 min)
+## Cierre
 
-- Evaluá con la clave: correcto/parcial/incorrecto; no cambies la respuesta original.
-- Elegí un solo error causal dominante y una regla de adaptación de la plantilla.
-- Anotá una frase: `En la próxima sesión voy a comprobar ______ antes de concluir ______.`
+- Guardá respuestas originales, confianza, pistas, comentario opcional y fricción al escribir sólo si existió.
+- Registrá final, tiempo total y tiempo aproximado de registro.
+- La evaluación y la próxima recomendación quedan para la IA; no completes esos campos.
 
 **Práctica externa siguiente:** 20–30 min de OverTheWire Bandit inicial o introducción guiada a terminal; TypeOps no la reemplaza.
 
 ### Criterio del piloto
 
-- **Demasiado difícil:** 3 o más actividades incorrectas aun usando el modelo, o 3+ pistas, o no se termina en 18 min por comprensión.
-- **Demasiado fácil:** 5 correctas sin pista, cierre incluido en menos de 12 min y podés justificar cada respuesta; usá después variantes, no más volumen.
-- **Demasiada fricción:** más de 5 min de registro, más de 3 min de fricción mecánica, o tenés que navegar entre archivos más de cuatro veces.
-- **Adecuado:** 12–18 min, al menos 3 respuestas correctas/parciales con razonamiento y un error causal identificable.
-
+- **Dificultad conceptual alta:** la IA encuentra 3 o más respuestas incorrectas por comprensión aun con el modelo, o se usaron 3+ pistas por bloqueo conceptual.
+- **Extensión excesiva:** las respuestas exceden repetidamente el formato o incluyen planes no solicitados; puede alargar la sesión sin indicar dificultad conceptual.
+- **Fricción administrativa:** el registro supera cinco minutos o obliga a navegar/rellenar campos que no aportan evidencia.
+- **Fricción al escribir:** el usuario reporta símbolos difíciles, muchas correcciones, comandos difíciles o problemas de edición. No se infiere por duración.
+- **Adecuado:** las respuestas permiten evaluar el razonamiento aunque el tiempo total exceda la referencia por extensión o registro.

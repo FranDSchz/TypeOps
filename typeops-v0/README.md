@@ -15,22 +15,21 @@ Las cuatro familias fueron conservadas porque cubren una cadena completa y peque
 ## Cómo ejecutar una sesión
 
 1. Abrí solamente el archivo de `sessions/` y una copia de `records/session-record-template.md`.
-2. Reservá entre 12 y 18 minutos. El cronómetro es orientativo, no una puntuación.
+2. Registrá hora de inicio y final. El tiempo total sirve para detectar respuestas extensas o fricción, no como puntuación.
 3. Leé el modelo mínimo y el ejemplo antes de responder. No consultes la clave.
-4. Escribí una respuesta breve, marcá confianza baja/media/alta y, si hace falta, pedí una pista.
+4. Respetá `Tarea`, `Formato de respuesta` y `Extensión máxima`; marcá confianza baja/media/alta y, si hace falta, pedí una pista.
 5. Para una pista, abrí la clave correspondiente y leé únicamente la sección **Pistas**, que aparece antes de las respuestas. Registrá la pista usada.
-6. Al terminar el bloque, compará con la rúbrica. No se exige coincidencia textual: importan los elementos esenciales y la evidencia esperada.
-7. Cerrá en dos minutos: registrá un error causal dominante, una verificación y la próxima práctica. El registro completo de una sesión no debería exceder cinco minutos.
+6. No te autoevalúes. Conservá la respuesta original y completá sólo confianza, pista, comentario opcional y fricción al escribir si realmente existió.
+7. Después, entregá sesión, clave, respuestas y registro a una IA usando `records/AI_EVALUATION_PROMPT.md`. La IA completa evaluación, error causal, verificación, feedback y próxima recomendación.
+8. Registrá únicamente inicio, final, tiempo total, tiempo aproximado de registro y, si ocurrió, un bloqueo excepcional. No estimes minutos por actividad.
 
 La sesión 1 es el piloto recomendado y no requiere instalar nada. El corpus estructurado está en `activities/activities.json` y `activities/variants.json`; no es necesario abrirlo para practicar.
 
-## Evaluación rápida
+## Evaluación posterior mediante IA
 
-- **Correcto:** incluye los elementos esenciales y una verificación suficiente cuando corresponde.
-- **Parcial:** la dirección es segura y útil, pero falta un elemento esencial o la verificación.
-- **Incorrecto:** confunde el concepto central, propone una acción insegura o no produce evidencia útil.
+La evaluación no requiere una API ni ocurre durante la sesión. Una IA recibe los cuatro artefactos y usa exclusivamente la clave y su rúbrica. Debe aceptar alternativas válidas, separar errores conceptuales de problemas de redacción y no inventar criterios.
 
-Usá un solo error causal principal: `desconocimiento`, `recuperación incompleta`, `confusión conceptual`, `siguiente acción débil`, `sintaxis`, `interpretación`, `verificación omitida`, `acción insegura`, `uso deficiente de IA` o `fricción mecánica`.
+La IA completa: `correcto/parcial/incorrecto`, un error causal principal cuando exista, `verificación suficiente/insuficiente`, feedback breve y próxima recomendación. El usuario no completa esos campos.
 
 ## Reglas manuales de adaptación
 
@@ -42,10 +41,10 @@ Usá un solo error causal principal: `desconocimiento`, `recuperación incomplet
 | Error de sintaxis | Reconstruir un fragmento contextual breve; no hacer una serie de teclas aisladas. |
 | Uso de pista | Resolver más adelante la variante correspondiente sin pista. |
 | Respuesta incorrecta con confianza alta | Contrastar explícitamente los dos conceptos confundidos antes de avanzar. |
-| Dificultad mecánica | Practicar el fragmento técnico dentro de contexto durante dos o tres minutos como máximo. |
+| Fricción al escribir reportada | Practicar el fragmento técnico dentro de contexto durante dos o tres minutos como máximo. |
 | Buen resultado independiente | Avanzar; no repetir innecesariamente. |
 
-Aplicá como máximo una regla por actividad. La plantilla de sesión repite estas reglas para evitar trabajo administrativo.
+Después de recibir la evaluación, aplicá como máximo una regla por actividad. La IA recomienda la próxima acción; el usuario sólo decide si la incorpora a la práctica siguiente.
 
 ## Variantes
 
@@ -64,6 +63,6 @@ Flags, checkers, ticks, SLA y scoring se explican sólo como un **modelo común 
 - [Sesión 1 — piloto](sessions/session-01.md) y [su clave](answer-keys/session-01-key.md).
 - [Sesiones](sessions/session-02.md): estímulos y orden exacto de práctica (continuar con los archivos 03–06 del mismo directorio).
 - [Actividades](activities/activities.json) y [variantes](activities/variants.json): corpus estructurado.
-- [Registro de sesión](records/session-record-template.md), [registro por actividad](records/activity-record-template.md) y [formulario piloto](records/pilot-record-example.md).
+- [Registro de sesión](records/session-record-template.md), [registro por actividad](records/activity-record-template.md), [formulario piloto](records/pilot-record-example.md) y [prompt de evaluación por IA](records/AI_EVALUATION_PROMPT.md).
 - [Drill 1](team-drills/drill-01.md), [drill 2](team-drills/drill-02.md) y [drill 3](team-drills/drill-03.md): coordinación sin roles permanentes.
 - [Clave de variantes](answer-keys/variants-key.md).

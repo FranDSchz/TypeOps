@@ -1,29 +1,28 @@
 # Ejemplo ficticio de registro del piloto
 
-Este ejemplo usa una actividad inventada `DEMO-00` para no revelar respuestas de la sesión 1.
+Este ejemplo usa una actividad inventada `DEMO-00`. Primero completa el usuario; la IA evalúa después.
 
-| ID | Respuesta original breve | Resultado | Confianza | Pistas | Error causal | Min | Verificación | Mecánico |
-|---|---|---|---|---:|---|---:|---|---|
-| DEMO-00 | “Miraría una señal y decidiría” | parcial | alta | 1 | siguiente acción débil | 2 | insuficiente | ninguno |
+| ID | Respuesta original breve | Confianza | Pista | Comentario opcional | Fricción al escribir, opcional |
+|---|---|---|---|---|---|
+| DEMO-00 | “Miraría una señal y decidiría” | alta | 1 | Dudé sobre qué evidencia registrar. | ninguna |
 
-**Comentario opcional:** la acción era segura, pero no decía qué evidencia esperaba ni cómo cambiaría la decisión.  
-**Regla aplicada:** acción sin evidencia → próxima actividad de verificación.  
-**No registrar:** cantidad total de teclas, WPM, una explicación larga o cada typo corregido.
+| ID | Evaluación IA | Error causal IA | Verificación IA | Feedback breve IA | Próxima recomendación IA |
+|---|---|---|---|---|---|
+| DEMO-00 | parcial | siguiente acción débil | insuficiente | La acción es segura, pero no define evidencia ni decisión condicional. | Practicar una actividad F2 con formato acción/evidencia/condicional. |
+
+**No registrar:** minutos por actividad, WPM, cada typo corregido ni una autoevaluación.
 
 ## Formulario listo para el piloto de hoy
 
-| ID | Respuesta original breve o enlace | Resultado | Confianza | Pistas | Error causal | Min | Verificación | Mecánico |
-|---|---|---|---|---:|---|---:|---|---|
-| F1-01 |  | C / P / I | B / M / A | 0 |  |  | S / I |  |
-| F1-02 |  | C / P / I | B / M / A | 0 |  |  | S / I |  |
-| F1-03 |  | C / P / I | B / M / A | 0 |  |  | S / I |  |
-| F2-01 |  | C / P / I | B / M / A | 0 |  |  | S / I |  |
-| F4-06 |  | C / P / I | B / M / A | 0 |  |  | S / I |  |
+**Inicio:** ____ **Final:** ____ **Tiempo total:** ____ **Registro aproximado:** ____  
+**Bloqueo excepcional, opcional:** ____
 
-**Total:** ____ min · **Registro:** ____ min · **Pistas:** ____ · **Correctas/parciales/incorrectas:** ____/____/____  
-**Dificultad:** demasiado difícil / adecuada / demasiado fácil  
-**Fricción:** aceptable / excesiva. Motivo: ____  
-**Una actividad más útil:** ____ porque ____  
-**Una actividad menos útil:** ____ porque ____  
-**Próxima decisión:** continuar / modificar duración o ayuda / detener y revisar.
+| ID | Respuesta original breve o enlace | Confianza | Pista | Comentario opcional | Fricción al escribir, opcional |
+|---|---|---|---|---|---|
+| F1-01 |  | baja / media / alta | ninguna / 1 |  | ninguna / descripción |
+| F1-02 |  | baja / media / alta | ninguna / 1 |  | ninguna / descripción |
+| F1-03 |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción |
+| F2-01 |  | baja / media / alta | ninguna / 1 / 2 |  | ninguna / descripción |
+| F4-06 |  | baja / media / alta | ninguna / 1 |  | ninguna / descripción |
 
+La evaluación, error causal, verificación, feedback y recomendación quedan vacíos hasta ejecutar el prompt de evaluación por IA.

@@ -14,7 +14,7 @@
       "prompt": "Indicá qué funciona, qué falla y la siguiente prueba que reduciría la incertidumbre.",
       "expected_output": "Estado por capas y prueba discriminante.",
       "hint_request": "Si volvés a necesitar pista, usá Pista 1 de la clave de variantes.",
-      "confidence": ["baja", "media", "alta"], "record_instruction": "Compará el error causal con F1-03.",
+      "confidence": ["baja", "media", "alta"], "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["reintento posterior", "sesión siguiente", "después de una pista"]
     },
     {
@@ -29,7 +29,7 @@
       "prompt": "Explicá qué sugieren las dos cabeceras, qué no prueban y cuál sería la próxima comprobación.",
       "expected_output": "Interpretación por capas y prueba segura.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Marcá si cookie volvió a equivaler a autenticación.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["sesión siguiente", "evaluación sin ayuda", "alta confianza incorrecta"]
     },
     {
@@ -44,7 +44,7 @@
       "prompt": "Proponé la siguiente observación, los datos a registrar y una conclusión que todavía no sería válida.",
       "expected_output": "Prueba repetida acotada, campos y límite de conclusión.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Marcá si propusiste reinicio sin caracterizar el fallo.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["reintento", "sesión siguiente", "después de una pista"]
     },
     {
@@ -59,7 +59,7 @@
       "prompt": "Decidí si hay evidencia suficiente de Broken Access Control, qué observarías y qué cambio de resultado sí sería relevante.",
       "expected_output": "Conclusión prudente, campos a comparar y criterio de hallazgo.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Registrá si usaste ‘otro ID’ como única evidencia.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["alta confianza incorrecta", "evaluación sin ayuda"]
     },
     {
@@ -74,7 +74,7 @@
       "prompt": "Completá `printf '[%s] [%s]\\n' ___ ___` y explicá qué protegen las comillas.",
       "expected_output": "Dos argumentos citados y explicación.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Anotá si el problema fue expansión o escritura de símbolos.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["después de una pista", "sesión siguiente", "error de sintaxis"]
     },
     {
@@ -89,7 +89,7 @@
       "prompt": "Escribí un curl POST JSON ficticio a `/save` y explicá cómo decidirías éxito usando status y body.",
       "expected_output": "Comando seguro y criterio doble.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Marcá sintaxis y verificación por separado.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["sesión siguiente", "evaluación sin ayuda", "verificación omitida"]
     },
     {
@@ -104,7 +104,7 @@
       "prompt": "Evaluá el cambio, indicá qué objetivo cumplió, cuál falló y la decisión operativa siguiente.",
       "expected_output": "Diagnóstico de regresión y decisión de corregir/revertir según plan.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Marcá si declaraste éxito mirando sólo el negativo.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["sesión 5 después de F4-02", "alta confianza incorrecta", "evaluación sin ayuda"]
     },
     {
@@ -119,7 +119,7 @@
       "prompt": "Reescribí la recomendación como hipótesis y definí dos comprobaciones seguras antes de usarla en competencia.",
       "expected_output": "Hipótesis explícita y validación de versión/opción.",
       "hint_request": "Pista 1 en la clave de variantes.", "confidence": ["baja", "media", "alta"],
-      "record_instruction": "Marcá si confundiste una sintaxis plausible con una confirmada.",
+      "record_instruction": "Registrá respuesta original, confianza, pista, comentario opcional y fricción al escribir sólo si existió.",
       "use_when": ["sesión siguiente", "después de una pista", "alta confianza incorrecta"]
     }
   ]

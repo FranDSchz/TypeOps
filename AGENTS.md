@@ -1,6 +1,7 @@
 # Propósito y criterios de trabajo
 
 - Este repositorio existe para mejorar la preparación real para competencias Attack-Defense CTF.
+- TypeOps es una herramienta complementaria de micropráctica adaptativa; no sustituye al tutor, los laboratorios, la terminal ni el estudio guiado, y no debe consumir más tiempo del que ahorra.
 - El conocimiento, la elección de acciones correctas, la ejecución segura y la verificación tienen prioridad sobre WPM.
 - Toda decisión de producto debe justificarse por un resultado de aprendizaje esperado o por evidencia observada.
 - Una función mencionada en una idea o lista no se convierte automáticamente en requisito.
@@ -8,4 +9,3 @@
 - Todo contenido ofensivo debe limitarse a CTF, laboratorios y sistemas explícitamente autorizados.
 - Las tareas complejas deben comenzar con un plan verificable.
 - Los documentos de `docs/` son fuentes de contexto; pueden y deben evolucionar cuando aparezca nueva evidencia.
-

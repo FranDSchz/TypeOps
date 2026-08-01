@@ -1,11 +1,22 @@
 # Registro rápido de actividad
 
-Copiá una línea por actividad. Objetivo: 15–30 segundos, no una narración. Con cinco actividades más el cierre, el overhead debe quedar por debajo de cinco minutos.
+El usuario completa únicamente el primer bloque. No estima tiempo ni se autoevalúa.
 
-| Actividad | Fecha | Respuesta original (o enlace) | Resultado | Confianza | Pistas | Error causal | Tiempo aprox. | Verificación | Error mecánico relevante | Comentario opcional |
-|---|---|---|---|---|---:|---|---:|---|---|---|
-|  |  |  | correcto / parcial / incorrecto | baja / media / alta | 0 / 1 / 2 | ver lista |  | suficiente / insuficiente | ninguno / fragmento |  |
+## Completa el usuario
 
-Errores permitidos: `desconocimiento`, `recuperación incompleta`, `confusión conceptual`, `siguiente acción débil`, `sintaxis`, `interpretación`, `verificación omitida`, `acción insegura`, `uso deficiente de IA`, `fricción mecánica`.
+**Actividad:** ____  
+**Respuesta original:** ____  
+**Confianza:** baja / media / alta  
+**Pista utilizada:** ninguna / pista 1 / pista 2  
+**Comentario opcional:** ____  
+**Fricción al escribir, opcional:** ninguna / símbolos difíciles / muchos errores o correcciones / comando difícil de escribir / problemas de edición / otra: ____
 
-Elegí sólo el error que mejor explica el resultado. Si fue correcto e independiente, dejá error causal como `ninguno`.
+No infieras fricción: dejá `ninguna` si el usuario no la reporta.
+
+## Completa posteriormente una IA
+
+**Evaluación:** correcto / parcial / incorrecto  
+**Error causal:** ____  
+**Verificación:** suficiente / insuficiente / no aplicable  
+**Feedback breve:** ____  
+**Próxima recomendación:** ____
