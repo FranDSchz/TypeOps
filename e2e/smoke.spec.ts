@@ -33,13 +33,13 @@ test.describe('TypeOps — smoke test', () => {
     await expect(skipLink).toHaveAttribute('href', '#main-content')
   })
 
-  test('navegación por Tab alcanza los botones de modo', async ({ page }) => {
+  test('navegación por Tab alcanza la ruta rápida de sesión recomendada', async ({ page }) => {
     await page.goto('/')
-    // Tab pasa por skip link y llega al primer modo
+    // Tab pasa por skip link y llega al botón de ruta rápida
     await page.keyboard.press('Tab')
     await page.keyboard.press('Tab')
     const focused = page.locator(':focus')
-    await expect(focused).toHaveId('mode-typing')
+    await expect(focused).toContainText('Iniciar sesión recomendada')
   })
 
   test('no hay errores de consola en la carga inicial', async ({ page }) => {

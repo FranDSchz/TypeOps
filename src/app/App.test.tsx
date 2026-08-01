@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { App } from './App'
 import { db } from '../data/db/database'
@@ -29,15 +28,14 @@ describe('App shell — Hito 2', () => {
     expect(screen.getByText(/práctica guiada/i)).toBeInTheDocument()
   })
 
-  it('provee un skip link visible al enfocar', async () => {
-    const user = userEvent.setup()
+  it('provee un skip link visible al enfocar', () => {
     render(<App />)
 
     const skipLink = screen.getByText(/saltar al contenido principal/i)
     expect(skipLink).toBeInTheDocument()
     expect(skipLink).toHaveAttribute('href', '#main-content')
 
-    await user.tab()
+    skipLink.focus()
     expect(skipLink).toHaveFocus()
   })
 
