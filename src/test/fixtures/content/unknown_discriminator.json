@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "unknown-kind-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack Discriminador Desconocido",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack con un tipo de item inventado.",
+  "sourceNotes": [],
+  "units": [
+    {
+      "unitId": "u1",
+      "title": "Unidad 1",
+      "summary": "Resumen de unidad",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": [],
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [],
+  "items": [
+    {
+      "itemId": "item-magic",
+      "kind": "magic_unsupported_kind",
+      "mode": "typing",
+      "unitIds": ["u1"],
+      "title": "Item mágico",
+      "context": "Contexto",
+      "task": "Tarea",
+      "responseFormat": "formato",
+      "maxResponse": { "lines": 1 },
+      "estimatedSeconds": 30,
+      "categories": [],
+      "skills": [],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [],
+      "explanation": "Explicación",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect } from 'vitest'
 import { App } from './App'
 
-describe('App shell — Hito 0', () => {
+describe('App shell — Hito 1', () => {
   it('renderiza el heading principal', () => {
     render(<App />)
     expect(
@@ -19,16 +19,20 @@ describe('App shell — Hito 0', () => {
     expect(screen.getByText(/práctica guiada/i)).toBeInTheDocument()
   })
 
+  it('muestra el estado del contrato de contenido cargado correctamente', () => {
+    render(<App />)
+    expect(screen.getByText(/contrato 1\.0\.0 ok/i)).toBeInTheDocument()
+    expect(screen.getByText(/typeops foundations/i)).toBeInTheDocument()
+  })
+
   it('provee un skip link visible al enfocar', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    // El skip link está en el DOM pero posicionado fuera de pantalla
     const skipLink = screen.getByText(/saltar al contenido principal/i)
     expect(skipLink).toBeInTheDocument()
     expect(skipLink).toHaveAttribute('href', '#main-content')
 
-    // Al hacer Tab, el skip link recibe foco
     await user.tab()
     expect(skipLink).toHaveFocus()
   })
@@ -56,7 +60,6 @@ describe('App shell — Hito 0', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    // Tab pasa por skip link, luego por los 4 botones de modo
     await user.tab() // skip link
     await user.tab() // mode-typing
     const typingBtn = screen.getByRole('button', { name: /typing técnico/i })

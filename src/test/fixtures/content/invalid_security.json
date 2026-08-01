@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "invalid-security-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack Seguridad Inválida",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack que intenta habilitar la ejecución de comandos.",
+  "sourceNotes": [],
+  "units": [
+    {
+      "unitId": "u1",
+      "title": "Unidad 1",
+      "summary": "Resumen",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": [],
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [],
+  "items": [
+    {
+      "itemId": "item-exec-true",
+      "kind": "typing_copy",
+      "mode": "typing",
+      "unitIds": ["u1"],
+      "title": "Ejecución Insegura",
+      "context": "Contexto",
+      "task": "Tarea",
+      "responseFormat": "formato",
+      "maxResponse": { "characters": 50 },
+      "estimatedSeconds": 20,
+      "categories": [],
+      "skills": [],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [],
+      "explanation": "Explicación",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": true
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "targetText": "whoami",
+      "language": "bash",
+      "display": "single_line",
+      "whitespacePolicy": "exact",
+      "fingerGuideEligible": false,
+      "technicalValidationNote": "Nota"
+    }
+  ]
+}

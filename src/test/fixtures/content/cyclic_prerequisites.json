@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "cyclic-prereq-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack Prerrequisitos Cíclicos",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack con un ciclo directo A -> B -> A.",
+  "sourceNotes": [],
+  "units": [
+    {
+      "unitId": "unit-a",
+      "title": "Unidad A",
+      "summary": "Resumen A",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": ["unit-b"],
+      "sourceNotes": []
+    },
+    {
+      "unitId": "unit-b",
+      "title": "Unidad B",
+      "summary": "Resumen B",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": ["unit-a"],
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [],
+  "items": []
+}

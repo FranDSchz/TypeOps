@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "2.0.0",
+  "packId": "incompatible-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack Incompatible",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack con versión mayor desconocida.",
+  "sourceNotes": [],
+  "units": [],
+  "items": [],
+  "guidedPaths": []
+}

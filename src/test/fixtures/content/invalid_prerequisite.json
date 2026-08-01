@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "invalid-prereq-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack Prerrequisito Inexistente",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack con prerrequisito que apunta a una unidad que no existe.",
+  "sourceNotes": [],
+  "units": [
+    {
+      "unitId": "u1",
+      "title": "Unidad 1",
+      "summary": "Resumen",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": ["unit-fantasma"],
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [],
+  "items": []
+}

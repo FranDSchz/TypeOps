@@ -1,11 +1,12 @@
+import { loadContentPack } from '../domain/content/loader'
+import officialPack from '../content/typeops-foundations-es-ar/pack.json'
 import './App.css'
 
 /**
- * TypeOps — App shell mínimo (Hito 0)
+ * TypeOps — App shell mínimo (Hito 1: Contrato y Loader de Contenido)
  *
- * Este componente provee el shell accesible y la pantalla de inicio.
- * Los cuatro modos son placeholders hasta el Hito 4 (recorrido vertical).
- * La navegación por teclado, skip link y roles semánticos se establecen aquí.
+ * Mantiene la navegación accesible y añade una integración mínima aislada
+ * para verificar que el ContentPack oficial se valida y carga correctamente.
  */
 
 interface ModeDefinition {
@@ -49,7 +50,6 @@ const MODES: ModeDefinition[] = [
 
 function ModeCard({ mode }: { mode: ModeDefinition }) {
   function handleClick() {
-    // Placeholder — implementación en Hito 4 (recorrido vertical)
     console.info(`Modo seleccionado: ${mode.id} (no implementado aún — Hito 4)`)
   }
 
@@ -81,10 +81,58 @@ function ModeCard({ mode }: { mode: ModeDefinition }) {
   )
 }
 
+/**
+ * Componente de desarrollo / soporte para mostrar el estado del contrato de contenido.
+ */
+function ContentPackStatusBanner() {
+  const loadResult = loadContentPack(officialPack)
+
+  if (!loadResult.success) {
+    return (
+      <div className="content-status content-status--error" role="alert">
+        <strong>Error de validación del pack de contenido:</strong>
+        <ul>
+          {loadResult.errors.map((err, idx) => (
+            <li key={idx}>
+              [{err.code}] {err.path}: {err.message}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  const pack = loadResult.pack
+  const countsByKind = pack.items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.kind] = (acc[item.kind] ?? 0) + 1
+    return acc
+  }, {})
+
+  const typingCount = countsByKind['typing_copy'] ?? 0
+  const commandCount = countsByKind['command_intention'] ?? 0
+  const reviewCount =
+    (countsByKind['exact_question'] ?? 0) +
+    (countsByKind['open_question'] ?? 0) +
+    (countsByKind['decision'] ?? 0)
+  const guidedCount = countsByKind['guided_practice'] ?? 0
+
+  return (
+    <aside
+      className="content-status content-status--valid"
+      aria-label="Estado del contrato de contenido"
+    >
+      <span className="badge badge--valid">Contrato 1.0.0 OK</span>
+      <span className="content-status-info">
+        Pack <strong>{pack.title}</strong> ({pack.packVersion}): {pack.items.length} ítems validados
+        ({typingCount} typing, {commandCount} command, {reviewCount} review, {guidedCount} guided).
+      </span>
+    </aside>
+  )
+}
+
 export function App() {
   return (
     <div className="app-shell">
-      {/* Skip link: primer elemento enfocable, salta al contenido principal */}
       <a href="#main-content" className="skip-link">
         Saltar al contenido principal
       </a>
@@ -106,6 +154,8 @@ export function App() {
               Sesiones de 2 a 10 minutos. Sin cuenta. Sin red. Sin formularios.
             </p>
           </div>
+
+          <ContentPackStatusBanner />
 
           <nav aria-label="Modos de práctica">
             <div

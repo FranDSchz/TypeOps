@@ -1,0 +1,462 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "typeops-foundations-es-ar",
+  "packVersion": "1.0.0",
+  "title": "TypeOps Foundations (es-AR)",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack inicial walking-skeleton de TypeOps V1 para micropráctica adaptativa.",
+  "sourceNotes": [
+    {
+      "type": "official_doc",
+      "title": "Documentación Man de GNU Coreutils",
+      "claimStatus": "confirmed",
+      "note": "Comandos estándar de Linux e inspección de logs."
+    }
+  ],
+  "units": [
+    {
+      "unitId": "unit-linux-basics",
+      "title": "Fundamentos de Shell Linux",
+      "summary": "Comandos esenciales de navegación y listado de archivos en sistemas Linux.",
+      "categories": ["linux", "shell"],
+      "skills": [
+        {
+          "skillId": "linux.ls",
+          "dimension": "knowledge"
+        }
+      ],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": [],
+      "sourceNotes": []
+    },
+    {
+      "unitId": "unit-log-inspection",
+      "title": "Inspección de Logs con tail",
+      "summary": "Monitoreo y lectura de fragmentos finales de archivos de registro.",
+      "categories": ["linux", "logs"],
+      "skills": [
+        {
+          "skillId": "linux.tail",
+          "dimension": "tool_selection"
+        }
+      ],
+      "pedagogicalDifficulty": 2,
+      "prerequisiteUnitIds": ["unit-linux-basics"],
+      "guidedPathId": "gp-tail-command",
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [
+    {
+      "pathId": "gp-tail-command",
+      "unitId": "unit-log-inspection",
+      "title": "Aprender el comando tail",
+      "stages": [
+        {
+          "stageId": "stg-1",
+          "stageType": "model",
+          "title": "Modelo de tail",
+          "content": "tail muestra las últimas líneas de un archivo de texto."
+        },
+        {
+          "stageId": "stg-2",
+          "stageType": "syntax_breakdown",
+          "title": "Sintaxis de tail",
+          "content": "tail -n <numero> <archivo>"
+        },
+        {
+          "stageId": "stg-3",
+          "stageType": "contextual_example",
+          "title": "Ejemplo de uso",
+          "content": "tail -n 20 /var/log/syslog"
+        },
+        {
+          "stageId": "stg-4",
+          "stageType": "guided_exercise",
+          "title": "Ejercicio guiado",
+          "content": "Escribí tail -n 5 /var/log/auth.log"
+        },
+        {
+          "stageId": "stg-5",
+          "stageType": "unassisted_exercise",
+          "title": "Ejercicio sin ayuda",
+          "content": "Mostrá las últimas 15 líneas de /var/log/nginx/access.log"
+        },
+        {
+          "stageId": "stg-6",
+          "stageType": "later_variant",
+          "title": "Variante posterior",
+          "content": "Variante programada para evaluación posterior."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "typing-ls-la",
+      "kind": "typing_copy",
+      "mode": "typing",
+      "unitIds": ["unit-linux-basics"],
+      "title": "Listar archivos ocultos y permisos",
+      "context": "Verificar permisos y archivos ocultos en /var/log.",
+      "task": "Copiá exactamente el comando mostrado.",
+      "responseFormat": "comando exacto",
+      "maxResponse": {
+        "characters": 100
+      },
+      "estimatedSeconds": 20,
+      "categories": ["linux", "typing"],
+      "skills": [
+        {
+          "skillId": "linux.ls",
+          "dimension": "mechanical"
+        }
+      ],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [
+        {
+          "hintId": "h1",
+          "level": 1,
+          "text": "Recordá la opción -la para detallar archivos ocultos.",
+          "reveals": "syntax"
+        }
+      ],
+      "explanation": "ls -la muestra todos los archivos incluyendo ocultos en formato detallado.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost", "fictional_files"],
+        "executionAllowed": false,
+        "note": "Operación inerte sobre sistema de archivos."
+      },
+      "mechanicalSequences": [
+        {
+          "value": "ls -la",
+          "type": "sequence"
+        }
+      ],
+      "sourceNotes": [],
+      "enabled": true,
+      "targetText": "ls -la /var/log",
+      "language": "bash",
+      "display": "single_line",
+      "whitespacePolicy": "exact",
+      "fingerGuideEligible": true,
+      "technicalValidationNote": "Comando Bash inerte estándar para listar archivos."
+    },
+    {
+      "itemId": "cmd-tail-n",
+      "kind": "command_intention",
+      "mode": "command",
+      "unitIds": ["unit-log-inspection"],
+      "title": "Inspeccionar últimas líneas de auth log",
+      "context": "Necesitás revisar los intentos recientes de autenticación.",
+      "task": "Escribí el comando para ver las últimas 20 líneas de /var/log/auth.log.",
+      "responseFormat": "un comando",
+      "maxResponse": {
+        "lines": 1,
+        "characters": 120
+      },
+      "estimatedSeconds": 45,
+      "categories": ["linux", "logs"],
+      "skills": [
+        {
+          "skillId": "linux.tail",
+          "dimension": "tool_selection"
+        }
+      ],
+      "difficulty": 2,
+      "prerequisiteUnitIds": ["unit-linux-basics"],
+      "hints": [
+        {
+          "hintId": "h-tail",
+          "level": 1,
+          "text": "Usá la herramienta tail con la opción -n.",
+          "reveals": "tool"
+        }
+      ],
+      "explanation": "tail -n 20 /var/log/auth.log muestra exactamente las últimas 20 entradas.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost", "fictional_files"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [
+        {
+          "value": "tail -n 20",
+          "type": "sequence"
+        }
+      ],
+      "sourceNotes": [],
+      "enabled": true,
+      "intent": "Mostrar las últimas 20 líneas de /var/log/auth.log",
+      "answerSpec": {
+        "acceptedAlternatives": [
+          {
+            "alternativeId": "alt-tail-1",
+            "text": "tail -n 20 /var/log/auth.log",
+            "tool": "tail",
+            "semanticTags": ["log_read", "tail_n"],
+            "explanation": "Sintaxis estándar preferida con opción -n separada."
+          },
+          {
+            "alternativeId": "alt-tail-2",
+            "text": "tail -20 /var/log/auth.log",
+            "tool": "tail",
+            "semanticTags": ["log_read", "tail_n_compact"],
+            "explanation": "Sintaxis compacta aceptada por GNU tail."
+          }
+        ],
+        "normalization": ["trim_outer", "line_endings", "spaces_outside_quotes"],
+        "toolChecks": [
+          {
+            "pattern": "^tail\\b",
+            "description": "Herramienta principal debe ser tail"
+          }
+        ],
+        "requiredFragments": ["tail", "/var/log/auth.log"],
+        "forbiddenFragments": ["rm", "cat /dev/null"],
+        "syntaxChecks": []
+      },
+      "captureMechanical": true,
+      "unrecognizedPolicy": "needs_review"
+    },
+    {
+      "itemId": "rev-linux-perm",
+      "kind": "exact_question",
+      "mode": "review",
+      "unitIds": ["unit-linux-basics"],
+      "title": "Permiso de ejecución en scripts",
+      "context": "Identificar el comando adecuado para otorgar permisos de ejecución.",
+      "task": "Seleccioná la opción correcta para hacer ejecutable un script bash.",
+      "responseFormat": "opción única",
+      "maxResponse": {
+        "bullets": 1
+      },
+      "estimatedSeconds": 30,
+      "categories": ["linux", "permissions"],
+      "skills": [
+        {
+          "skillId": "linux.chmod",
+          "dimension": "knowledge"
+        }
+      ],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [],
+      "explanation": "chmod +x agrega permiso de ejecución para usuario, grupo y otros.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "answerType": "single_choice",
+      "options": [
+        {
+          "optionId": "opt-1",
+          "text": "chmod +x script.sh",
+          "explanation": "Correcto. +x otorga permiso de ejecución."
+        },
+        {
+          "optionId": "opt-2",
+          "text": "chown +x script.sh",
+          "explanation": "Incorrecto. chown cambia el propietario, no los permisos."
+        }
+      ],
+      "acceptedAnswers": ["opt-1"],
+      "caseSensitive": false
+    },
+    {
+      "itemId": "rev-open-incident",
+      "kind": "open_question",
+      "mode": "review",
+      "unitIds": ["unit-log-inspection"],
+      "title": "Análisis de intento de fuerza bruta",
+      "context": "Observás múltiples fallos de login fallidos desde la misma IP en auth.log.",
+      "task": "Explicá brevemente la primera acción de verificación recomendada.",
+      "responseFormat": "explicación en 2-3 frases",
+      "maxResponse": {
+        "lines": 4,
+        "characters": 300
+      },
+      "estimatedSeconds": 120,
+      "categories": ["incident", "analysis"],
+      "skills": [
+        {
+          "skillId": "incident.verify",
+          "dimension": "verification"
+        }
+      ],
+      "difficulty": 2,
+      "prerequisiteUnitIds": ["unit-log-inspection"],
+      "hints": [],
+      "explanation": "Verificar la tasa de intentos, usuario objetivo y si algún intento resultó exitoso.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "rubric": {
+        "rubricId": "rub-open-incident",
+        "essentialElements": ["Verificar estado de éxito/fallo", "Identificar usuario objetivo"],
+        "acceptableAlternatives": ["Revisar timestamps en auth.log"],
+        "commonErrors": [
+          {
+            "errorCode": "verification_omitted",
+            "explanation": "Bloquear la IP inmediatamente sin verificar si hubo sesión exitosa previa."
+          }
+        ],
+        "verificationCriterion": "La respuesta debe incluir la verificación del resultado de los intentos.",
+        "doNotInfer": ["No asumir compromiso total sin verificar el status de la sesión."]
+      },
+      "reviewPolicy": "pending_external",
+      "captureMechanical": false
+    },
+    {
+      "itemId": "rev-dec-log",
+      "kind": "decision",
+      "mode": "review",
+      "unitIds": ["unit-log-inspection"],
+      "title": "Decisión ante pico de peticiones HTTP 404",
+      "context": "Monitoreando el servidor web durante la competencia.",
+      "task": "Seleccioná la decisión más fundamentada según la evidencia observada.",
+      "responseFormat": "selección con evidencia requerida",
+      "maxResponse": {
+        "bullets": 2
+      },
+      "estimatedSeconds": 90,
+      "categories": ["http", "decision"],
+      "skills": [
+        {
+          "skillId": "http.log_analysis",
+          "dimension": "interpretation"
+        }
+      ],
+      "difficulty": 2,
+      "prerequisiteUnitIds": ["unit-log-inspection"],
+      "hints": [],
+      "explanation": "Un scanner de directorios produce 404 continuos en rutas inexistentes.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["example.test"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "evidence": [
+        {
+          "evidenceId": "ev-1",
+          "text": "150 peticiones GET /admin, /test, /wp-admin en 5 segundos generando HTTP 404."
+        }
+      ],
+      "choices": [
+        {
+          "choiceId": "ch-1",
+          "text": "Identificar actividad de recon/fuzzing web sin impacto de explotación aún."
+        },
+        {
+          "choiceId": "ch-2",
+          "text": "Reiniciar la aplicación inmediatamente."
+        }
+      ],
+      "correctChoiceIds": ["ch-1"],
+      "requiredEvidenceIds": ["ev-1"],
+      "conditionalBranches": [
+        {
+          "condition": "Si aparece HTTP 200 en una ruta sensible",
+          "consequence": "Revisar sesión e identificar exfiltración."
+        }
+      ]
+    },
+    {
+      "itemId": "guided-tail-intro",
+      "kind": "guided_practice",
+      "mode": "guided",
+      "unitId": "unit-log-inspection",
+      "unitIds": ["unit-log-inspection"],
+      "title": "Práctica guiada: Uso de tail para logs",
+      "context": "Primera aproximación a la inspección de archivos de registro.",
+      "task": "Completá las seis etapas de la secuencia guiada.",
+      "responseFormat": "pasos interactivos",
+      "maxResponse": {
+        "lines": 10
+      },
+      "estimatedSeconds": 180,
+      "categories": ["linux", "guided"],
+      "skills": [
+        {
+          "skillId": "linux.tail",
+          "dimension": "tool_selection"
+        }
+      ],
+      "difficulty": 1,
+      "prerequisiteUnitIds": ["unit-linux-basics"],
+      "hints": [],
+      "explanation": "Completaste la práctica guiada de tail.",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost", "fictional_files"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "stages": [
+        {
+          "stageId": "stg-1",
+          "stageType": "model",
+          "title": "Modelo de tail",
+          "content": "tail es la herramienta estándar en Linux para inspeccionar el final de archivos."
+        },
+        {
+          "stageId": "stg-2",
+          "stageType": "syntax_breakdown",
+          "title": "Descomposición de sintaxis",
+          "content": "tail -n <cantidad> <ruta>"
+        },
+        {
+          "stageId": "stg-3",
+          "stageType": "contextual_example",
+          "title": "Ejemplo contextual",
+          "content": "tail -n 10 /var/log/syslog"
+        },
+        {
+          "stageId": "stg-4",
+          "stageType": "guided_exercise",
+          "title": "Ejercicio guiado",
+          "content": "Escribí tail -n 20 /var/log/auth.log"
+        },
+        {
+          "stageId": "stg-5",
+          "stageType": "unassisted_exercise",
+          "title": "Ejercicio sin ayuda",
+          "content": "Escribí el comando para ver 20 líneas de auth.log sin ayuda."
+        },
+        {
+          "stageId": "stg-6",
+          "stageType": "later_variant",
+          "title": "Variante posterior",
+          "content": "Resolverás la variante en el ítem cmd-tail-n."
+        }
+      ],
+      "resumePolicy": "next_incomplete_stage",
+      "promotionRule": "complete_unassisted_and_later_variant",
+      "laterVariantItemId": "cmd-tail-n"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "duplicate-id-pack",
+  "packVersion": "1.0.0",
+  "title": "Pack IDs Duplicados",
+  "locale": "es-AR",
+  "createdAt": "2026-08-01T00:00:00Z",
+  "updatedAt": "2026-08-01T00:00:00Z",
+  "description": "Pack con dos ítems que comparten el mismo ID.",
+  "sourceNotes": [],
+  "units": [
+    {
+      "unitId": "u1",
+      "title": "Unidad 1",
+      "summary": "Resumen",
+      "categories": [],
+      "skills": [],
+      "pedagogicalDifficulty": 1,
+      "prerequisiteUnitIds": [],
+      "sourceNotes": []
+    }
+  ],
+  "guidedPaths": [],
+  "items": [
+    {
+      "itemId": "item-dup",
+      "kind": "typing_copy",
+      "mode": "typing",
+      "unitIds": ["u1"],
+      "title": "Item 1",
+      "context": "Contexto",
+      "task": "Tarea",
+      "responseFormat": "formato",
+      "maxResponse": { "characters": 50 },
+      "estimatedSeconds": 20,
+      "categories": [],
+      "skills": [],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [],
+      "explanation": "Explicación",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "targetText": "ls",
+      "language": "bash",
+      "display": "single_line",
+      "whitespacePolicy": "exact",
+      "fingerGuideEligible": false,
+      "technicalValidationNote": "Nota"
+    },
+    {
+      "itemId": "item-dup",
+      "kind": "typing_copy",
+      "mode": "typing",
+      "unitIds": ["u1"],
+      "title": "Item 2 con ID duplicado",
+      "context": "Contexto",
+      "task": "Tarea",
+      "responseFormat": "formato",
+      "maxResponse": { "characters": 50 },
+      "estimatedSeconds": 20,
+      "categories": [],
+      "skills": [],
+      "difficulty": 1,
+      "prerequisiteUnitIds": [],
+      "hints": [],
+      "explanation": "Explicación",
+      "categoryVisibility": "visible",
+      "securityContext": {
+        "scope": "safe_inert",
+        "targets": ["localhost"],
+        "executionAllowed": false
+      },
+      "mechanicalSequences": [],
+      "sourceNotes": [],
+      "enabled": true,
+      "targetText": "pwd",
+      "language": "bash",
+      "display": "single_line",
+      "whitespacePolicy": "exact",
+      "fingerGuideEligible": false,
+      "technicalValidationNote": "Nota"
+    }
+  ]
+}
