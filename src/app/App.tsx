@@ -1,0 +1,134 @@
+import './App.css'
+
+/**
+ * TypeOps — App shell mínimo (Hito 0)
+ *
+ * Este componente provee el shell accesible y la pantalla de inicio.
+ * Los cuatro modos son placeholders hasta el Hito 4 (recorrido vertical).
+ * La navegación por teclado, skip link y roles semánticos se establecen aquí.
+ */
+
+interface ModeDefinition {
+  id: string
+  label: string
+  title: string
+  description: string
+  shortcut: string
+}
+
+const MODES: ModeDefinition[] = [
+  {
+    id: 'typing',
+    label: 'Modo 1',
+    title: 'Typing técnico',
+    description: 'Copiá fragmentos técnicos coherentes. Se registran errores iniciales, correcciones y latencias.',
+    shortcut: '1',
+  },
+  {
+    id: 'command',
+    label: 'Modo 2',
+    title: 'Comando desde intención',
+    description: 'Escribí el comando que satisface una intención operacional. Evaluación por dimensiones.',
+    shortcut: '2',
+  },
+  {
+    id: 'review',
+    label: 'Modo 3',
+    title: 'Repaso y decisiones',
+    description: 'Recuperación conceptual, siguiente acción, interpretación de output y verificación.',
+    shortcut: '3',
+  },
+  {
+    id: 'guided',
+    label: 'Modo 4',
+    title: 'Práctica guiada',
+    description: 'Seis etapas: modelo, sintaxis, ejemplo, ejercicio guiado, sin ayuda y variante posterior.',
+    shortcut: '4',
+  },
+]
+
+function ModeCard({ mode }: { mode: ModeDefinition }) {
+  function handleClick() {
+    // Placeholder — implementación en Hito 4 (recorrido vertical)
+    console.info(`Modo seleccionado: ${mode.id} (no implementado aún — Hito 4)`)
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleClick()
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="mode-card"
+      id={`mode-${mode.id}`}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      aria-label={`${mode.title}: ${mode.description}`}
+    >
+      <span className="mode-card-label" aria-hidden="true">
+        {mode.label}
+      </span>
+      <span className="mode-card-title">{mode.title}</span>
+      <span className="mode-card-desc">{mode.description}</span>
+      <span className="badge badge--wip" aria-label="Próximamente disponible">
+        Hito 4
+      </span>
+    </button>
+  )
+}
+
+export function App() {
+  return (
+    <div className="app-shell">
+      {/* Skip link: primer elemento enfocable, salta al contenido principal */}
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
+
+      <header className="app-header" role="banner">
+        <span className="app-logo" aria-label="TypeOps">
+          TypeOps
+          <span className="app-logo-sub" aria-hidden="true">v1</span>
+        </span>
+      </header>
+
+      <main id="main-content" className="app-main" role="main">
+        <section className="home-screen" aria-labelledby="home-heading">
+          <div>
+            <h1 id="home-heading" className="home-title">
+              Micropráctica adaptativa
+            </h1>
+            <p className="home-subtitle">
+              Sesiones de 2 a 10 minutos. Sin cuenta. Sin red. Sin formularios.
+            </p>
+          </div>
+
+          <nav aria-label="Modos de práctica">
+            <div
+              className="mode-grid"
+              role="list"
+              aria-label="Cuatro modos disponibles"
+            >
+              {MODES.map((mode) => (
+                <div key={mode.id} role="listitem">
+                  <ModeCard mode={mode} />
+                </div>
+              ))}
+            </div>
+          </nav>
+        </section>
+      </main>
+
+      <footer className="app-footer" role="contentinfo">
+        <p>
+          TypeOps — local-first, monousuario, sin backend.{' '}
+          <span aria-hidden="true">⌨</span>
+        </p>
+      </footer>
+    </div>
+  )
+}
