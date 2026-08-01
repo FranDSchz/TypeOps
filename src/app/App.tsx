@@ -1,12 +1,8 @@
-import { loadContentPack } from '../domain/content/loader'
-import officialPack from '../content/typeops-foundations-es-ar/pack.json'
+import { DevStoragePanel } from './DevStoragePanel'
 import './App.css'
 
 /**
- * TypeOps — App shell mínimo (Hito 1: Contrato y Loader de Contenido)
- *
- * Mantiene la navegación accesible y añade una integración mínima aislada
- * para verificar que el ContentPack oficial se valida y carga correctamente.
+ * TypeOps — App shell (Hito 2: Persistencia local e intercambio seguro de datos)
  */
 
 interface ModeDefinition {
@@ -81,55 +77,6 @@ function ModeCard({ mode }: { mode: ModeDefinition }) {
   )
 }
 
-/**
- * Componente de desarrollo / soporte para mostrar el estado del contrato de contenido.
- */
-function ContentPackStatusBanner() {
-  const loadResult = loadContentPack(officialPack)
-
-  if (!loadResult.success) {
-    return (
-      <div className="content-status content-status--error" role="alert">
-        <strong>Error de validación del pack de contenido:</strong>
-        <ul>
-          {loadResult.errors.map((err, idx) => (
-            <li key={idx}>
-              [{err.code}] {err.path}: {err.message}
-            </li>
-          ))}
-        </ul>
-      </div>
-    )
-  }
-
-  const pack = loadResult.pack
-  const countsByKind = pack.items.reduce<Record<string, number>>((acc, item) => {
-    acc[item.kind] = (acc[item.kind] ?? 0) + 1
-    return acc
-  }, {})
-
-  const typingCount = countsByKind['typing_copy'] ?? 0
-  const commandCount = countsByKind['command_intention'] ?? 0
-  const reviewCount =
-    (countsByKind['exact_question'] ?? 0) +
-    (countsByKind['open_question'] ?? 0) +
-    (countsByKind['decision'] ?? 0)
-  const guidedCount = countsByKind['guided_practice'] ?? 0
-
-  return (
-    <aside
-      className="content-status content-status--valid"
-      aria-label="Estado del contrato de contenido"
-    >
-      <span className="badge badge--valid">Contrato 1.0.0 OK</span>
-      <span className="content-status-info">
-        Pack <strong>{pack.title}</strong> ({pack.packVersion}): {pack.items.length} ítems validados
-        ({typingCount} typing, {commandCount} command, {reviewCount} review, {guidedCount} guided).
-      </span>
-    </aside>
-  )
-}
-
 export function App() {
   return (
     <div className="app-shell">
@@ -140,7 +87,7 @@ export function App() {
       <header className="app-header" role="banner">
         <span className="app-logo" aria-label="TypeOps">
           TypeOps
-          <span className="app-logo-sub" aria-hidden="true">v1</span>
+          <span className="app-logo-sub" aria-hidden="true">v1 (Hito 2)</span>
         </span>
       </header>
 
@@ -155,7 +102,7 @@ export function App() {
             </p>
           </div>
 
-          <ContentPackStatusBanner />
+          <DevStoragePanel />
 
           <nav aria-label="Modos de práctica">
             <div
