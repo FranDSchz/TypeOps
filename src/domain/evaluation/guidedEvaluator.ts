@@ -1,5 +1,6 @@
 import type { GuidedPracticeItem, GuidedStageType } from '../content/types'
 import type { EvaluationResult } from './types'
+import { normalizeCommand } from './commandEvaluator'
 
 export interface StageCapabilities {
   teaches: boolean
@@ -104,8 +105,36 @@ export function evaluateGuidedStage(
     }
   }
 
+  const spec = stage.expectedAction
+  if (spec) {
+    const normalizedInput = normalizeCommand(input.responseRaw, spec.normalization)
+    const isMatched = spec.acceptedAlternatives.some(
+      (alt) => normalizeCommand(alt, spec.normalization) === normalizedInput,
+    )
+
+    if (isMatched) {
+      return {
+        status: 'correct',
+        dimensionResults: {
+          concept: 'correct',
+          toolSelection: 'correct',
+          semanticStructure: 'correct',
+          syntax: 'correct',
+          interpretation: 'not_assessed',
+          verification: 'not_assessed',
+          mechanical: 'not_assessed',
+        },
+        errorCodes: [],
+        feedbackCode: 'GUIDED_STAGE_CORRECT',
+        feedbackMessage: `Respuesta correcta en la etapa '${stage.title}'.`,
+        requiresReview: false,
+        stageCapabilities: capabilities,
+      }
+    }
+  }
+
   return {
-    status: 'not_assessed',
+    status: 'needs_review',
     dimensionResults: {
       concept: 'not_assessed',
       toolSelection: 'not_assessed',
@@ -116,9 +145,9 @@ export function evaluateGuidedStage(
       mechanical: 'not_assessed',
     },
     errorCodes: [],
-    feedbackCode: 'GUIDED_STAGE_RECORDED',
-    feedbackMessage: `Actividad guiada registrada para la etapa '${stage.title}'.`,
-    requiresReview: false,
+    feedbackCode: 'GUIDED_STAGE_NEEDS_REVIEW',
+    feedbackMessage: `Respuesta registrada para '${stage.title}'. Pendiente de revisión.`,
+    requiresReview: true,
     stageCapabilities: capabilities,
   }
 }

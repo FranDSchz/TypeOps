@@ -64,6 +64,10 @@ export interface EvaluationOptions {
   confidence?: 'low' | 'medium' | 'high'
   /** Observación mecánica inmutable consolidada (Subhito 5B) */
   mechanicalObservation?: MechanicalObservation
+  /** Identificador opcional de la etapa guiada (Subhito 5C) */
+  guidedStageId?: string
+  /** Indica si la respuesta es una omisión explícita del ejercicio */
+  isSkipped?: boolean
 }
 
 export interface MechanicalCaptureEvent {

@@ -57,6 +57,11 @@ export async function exportFullBackup(
     envelope.mechanicalProfiles = profiles
   }
 
+  const guidedRecords = await db.guidedProgress.toArray()
+  if (guidedRecords.length > 0) {
+    envelope.guidedProgress = guidedRecords
+  }
+
   if (Object.keys(settings).length > 0) {
     envelope.settings = settings
   }

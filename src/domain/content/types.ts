@@ -104,12 +104,19 @@ export type GuidedStageType =
   | 'unassisted_exercise'
   | 'later_variant'
 
+export interface GuidedCommandAnswerSpec {
+  kind: 'command'
+  acceptedAlternatives: string[]
+  normalization: CommandNormalizationOption[]
+  unrecognizedPolicy: 'needs_review'
+}
+
 export interface GuidedStage {
   stageId: string
   stageType: GuidedStageType
   title: string
   content: string
-  expectedAction?: string
+  expectedAction?: GuidedCommandAnswerSpec
   advancementCriterion?: string
 }
 

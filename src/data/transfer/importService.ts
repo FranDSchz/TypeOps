@@ -19,9 +19,21 @@ export async function generateImportPreview(
   input: unknown,
   db: TypeOpsDatabase,
 ): Promise<ImportPreview> {
-  // 1. Probar si la entrada es un sobre de exportación completo (TypeOpsExportEnvelope)
-  const envelopeResult = loadExportEnvelope(input)
-  if (envelopeResult.success) {
+  if (typeof input === 'object' && input !== null && (input as { format?: string }).format === 'typeops-export') {
+    const envelopeResult = loadExportEnvelope(input)
+    if (!envelopeResult.success) {
+      return {
+        valid: false,
+        sourceType: 'backup_envelope',
+        unitCount: 0,
+        itemCount: 0,
+        itemsByKind: {},
+        proposedAction: 'invalid',
+        checksum: '',
+        warnings: [],
+        errors: envelopeResult.errors,
+      }
+    }
     return generateBackupEnvelopePreview(envelopeResult.envelope)
   }
 
@@ -209,7 +221,7 @@ export async function confirmImport(
     }
 
     try {
-      await db.transaction('rw', [db.contentPacks, db.settings, db.mechanicalProfiles], async () => {
+      await db.transaction('rw', [db.contentPacks, db.settings, db.mechanicalProfiles, db.guidedProgress], async () => {
         for (const record of recordsToStore) {
           await db.contentPacks.put(record)
         }
@@ -218,6 +230,14 @@ export async function confirmImport(
           for (const prof of envelope.mechanicalProfiles) {
             if (prof.profileKey && prof.packId) {
               await db.mechanicalProfiles.put(prof)
+            }
+          }
+        }
+
+        if (Array.isArray(envelope.guidedProgress)) {
+          for (const guidedRec of envelope.guidedProgress) {
+            if (guidedRec.progressKey && guidedRec.packId) {
+              await db.guidedProgress.put(guidedRec)
             }
           }
         }

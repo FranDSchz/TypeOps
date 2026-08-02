@@ -6,13 +6,14 @@ import type {
   AttemptRecord,
   LearningProgressRecord,
   MechanicalProfileRecord,
+  GuidedItemProgressRecord,
 } from './records'
 
 /**
  * TypeOps V1 — Dexie IndexedDB Database
  *
- * Base de datos local-first. En Hito 5 amplía las tablas a v3:
- * 'contentPacks', 'settings', 'sessions', 'attempts', 'learningProgress', 'mechanicalProfiles'.
+ * Base de datos local-first. En Subhito 5C amplía las tablas a v4:
+ * 'contentPacks', 'settings', 'sessions', 'attempts', 'learningProgress', 'mechanicalProfiles', 'guidedProgress'.
  */
 export class TypeOpsDatabase extends Dexie {
   contentPacks!: Table<ContentPackRecord, string>
@@ -21,6 +22,7 @@ export class TypeOpsDatabase extends Dexie {
   attempts!: Table<AttemptRecord, string>
   learningProgress!: Table<LearningProgressRecord, string>
   mechanicalProfiles!: Table<MechanicalProfileRecord, string>
+  guidedProgress!: Table<GuidedItemProgressRecord, string>
 
   constructor(databaseName = 'TypeOpsDB') {
     super(databaseName)
@@ -48,6 +50,17 @@ export class TypeOpsDatabase extends Dexie {
       attempts: 'attemptId, sessionId, itemId, unitId, createdAt',
       learningProgress: 'compositeUnitKey, unitId, packId, state, nextReviewAt, lastPracticedAt',
       mechanicalProfiles: 'profileKey, packId',
+    })
+
+    // Versión 4 del esquema de IndexedDB (Subhito 5C)
+    this.version(4).stores({
+      contentPacks: 'packId, packVersion, schemaVersion, title, checksum',
+      settings: 'key',
+      sessions: 'sessionId, mode, status, startedAt',
+      attempts: 'attemptId, sessionId, itemId, unitId, createdAt',
+      learningProgress: 'compositeUnitKey, unitId, packId, state, nextReviewAt, lastPracticedAt',
+      mechanicalProfiles: 'profileKey, packId',
+      guidedProgress: 'progressKey, packId, itemId',
     })
   }
 }

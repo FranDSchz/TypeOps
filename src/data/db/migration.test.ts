@@ -222,4 +222,123 @@ class V2Database extends Dexie {
       }
     }
   })
+
+  it('migra una base v3 a v4 preservando registros en las 6 tablas e instanciando la tabla guidedProgress (Subhito 5C)', async () => {
+    const dbName = `TypeOpsDB_Migration_V3_V4_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`
+    const dbV3 = new TypeOpsDatabase(dbName)
+    try {
+      // 1. Poblar las 6 tablas en versión 3 del esquema
+      await dbV3.settings.put({ key: 'activePackId', value: 'pack-v3-test', updatedAt: '2026-08-02T10:00:00.000Z' })
+      await dbV3.contentPacks.put({
+        packId: 'pack-v3-test',
+        packVersion: '1.0.0',
+        schemaVersion: '1.0.0',
+        title: 'Pack V3 Test',
+        locale: 'es-AR',
+        checksum: 'sha256-v3',
+        content: officialPack as ContentPack,
+        importedAt: '2026-08-02T10:00:00.000Z',
+        updatedAt: '2026-08-02T10:00:00.000Z',
+      })
+      await dbV3.sessions.put({
+        sessionId: 'sess-v3-test',
+        packId: 'pack-v3-test',
+        packVersion: '1.0.0',
+        mode: 'guided',
+        presetName: '5_minutes',
+        startedAt: '2026-08-02T10:00:00.000Z',
+        deadlineAt: '2026-08-02T10:05:00.000Z',
+        planItems: [],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: '2026-08-02T10:00:00.000Z',
+        updatedAt: '2026-08-02T10:00:00.000Z',
+      })
+      await dbV3.attempts.put({
+        attemptId: 'att-v3-test',
+        sessionId: 'sess-v3-test',
+        packId: 'pack-v3-test',
+        packVersion: '1.0.0',
+        itemId: 'guided-tail-intro',
+        unitId: 'unit-log-inspection',
+        responseRaw: 'tail -n 20 /var/log/auth.log',
+        evaluationResult: {
+          status: 'correct',
+          dimensionResults: { concept: 'correct', toolSelection: 'correct', semanticStructure: 'correct', syntax: 'correct', interpretation: 'not_assessed', verification: 'not_assessed', mechanical: 'not_assessed' },
+          errorCodes: [],
+          feedbackCode: 'OK',
+          feedbackMessage: 'OK',
+          requiresReview: false,
+        },
+        workflowStatus: 'evaluated',
+        hintsUsedCount: 0,
+        durationMs: 3000,
+        createdAt: '2026-08-02T10:00:00.000Z',
+      })
+      await dbV3.learningProgress.put({
+        compositeUnitKey: 'pack-v3-test:unit-log-inspection',
+        packId: 'pack-v3-test',
+        unitId: 'unit-log-inspection',
+        state: 'learning',
+        independentSuccessesCount: 0,
+        practicedItemIds: ['guided-tail-intro'],
+        updatedAt: '2026-08-02T10:00:00.000Z',
+      })
+      await dbV3.mechanicalProfiles.put({
+        profileKey: 'pack-v3-test:1.0.0',
+        packId: 'pack-v3-test',
+        packVersion: '1.0.0',
+        characterMetrics: {},
+        sequenceMetrics: {},
+        updatedAt: '2026-08-02T10:00:00.000Z',
+      })
+
+      dbV3.close()
+
+      // 2. Reabrir mediante TypeOpsDatabase (v4) en la misma base
+      const dbV4 = new TypeOpsDatabase(dbName)
+      try {
+        // Verificar las 6 tablas anteriores intactas
+        const setting = await dbV4.settings.get('activePackId')
+        expect(setting?.value).toBe('pack-v3-test')
+
+        const pack = await dbV4.contentPacks.get('pack-v3-test')
+        expect(pack?.title).toBe('Pack V3 Test')
+
+        const session = await dbV4.sessions.get('sess-v3-test')
+        expect(session?.mode).toBe('guided')
+
+        const attempt = await dbV4.attempts.get('att-v3-test')
+        expect(attempt?.attemptId).toBe('att-v3-test')
+
+        const progress = await dbV4.learningProgress.get('pack-v3-test:unit-log-inspection')
+        expect(progress?.state).toBe('learning')
+
+        const profile = await dbV4.mechanicalProfiles.get('pack-v3-test:1.0.0')
+        expect(profile?.profileKey).toBe('pack-v3-test:1.0.0')
+
+        // Verificar la nueva tabla guidedProgress
+        expect(dbV4.guidedProgress).toBeDefined()
+        await dbV4.guidedProgress.put({
+          progressKey: 'pack-v3-test:1.0.0:guided-tail-intro',
+          packId: 'pack-v3-test',
+          packVersion: '1.0.0',
+          itemId: 'guided-tail-intro',
+          completedStageIds: ['stg-1', 'stg-2'],
+          updatedAt: new Date().toISOString(),
+        })
+
+        const guidedRec = await dbV4.guidedProgress.get('pack-v3-test:1.0.0:guided-tail-intro')
+        expect(guidedRec?.completedStageIds).toEqual(['stg-1', 'stg-2'])
+      } finally {
+        dbV4.close()
+        await dbV4.delete()
+      }
+    } finally {
+      if (dbV3.isOpen()) {
+        dbV3.close()
+      }
+    }
+  })
 })

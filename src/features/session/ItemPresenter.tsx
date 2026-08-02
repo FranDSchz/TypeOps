@@ -1,8 +1,9 @@
 import type { SyntheticEvent } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { ContentItem } from '../../domain/content/types'
 import { getStageCapabilities } from '../../domain/evaluation/guidedEvaluator'
 import { validateResponsePresent } from '../../domain/evaluation/responseValidation'
+import { deriveActiveGuidedStage, type GuidedItemProgressRecord } from '../../domain/learning/guidedState'
 
 import { useMechanicalCapture } from './useMechanicalCapture'
 import type { EvaluationOptions } from '../../domain/evaluation/types'
@@ -13,6 +14,9 @@ interface ItemPresenterProps {
   disabled?: boolean
   onSubmitResponse: (responseRaw: unknown, durationMs?: number, options?: EvaluationOptions) => void
   onUseHint?: () => void
+  onAdvanceGuidedStage?: (stageId: string) => void | Promise<void>
+  guidedProgress?: GuidedItemProgressRecord | null
+  attemptsCountForActiveStage?: number
 }
 
 export function ItemPresenter({
@@ -20,11 +24,13 @@ export function ItemPresenter({
   activeHintLevel,
   disabled = false,
   onSubmitResponse,
+  onAdvanceGuidedStage,
+  guidedProgress = null,
+  attemptsCountForActiveStage = 0,
 }: ItemPresenterProps) {
   const mechanicalCapture = useMechanicalCapture()
   const { resetCapture } = mechanicalCapture
   const [pasteNotice, setPasteNotice] = useState(false)
-
   // Reset del hook de captura al cambiar de ítem
   useEffect(() => {
     setTextInput('')
@@ -48,14 +54,17 @@ export function ItemPresenter({
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([])
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Pistas visibles según el activeHintLevel
-  const visibleHints = item.hints.slice(0, activeHintLevel)
+  // Derivar la etapa activa actual para ítems guided
+  const activeStageResult = useMemo(() => {
+    if (item.kind !== 'guided_practice') return null
+    return deriveActiveGuidedStage(item, guidedProgress)
+  }, [item, guidedProgress])
 
-  // Encontrar dinámicamente la etapa evaluable para ítems guided sin hardcodear índices o IDs
-  const evaluableStage =
-    item.kind === 'guided_practice'
-      ? item.stages.find((s) => getStageCapabilities(s.stageType).requiresAttempt)
-      : undefined
+  const activeStage = activeStageResult?.activeStage
+
+  // Ocultar pistas si la etapa activa es unassisted_exercise (Mandato 6)
+  const isUnassistedStage = activeStage?.stageType === 'unassisted_exercise'
+  const visibleHints = isUnassistedStage ? [] : item.hints.slice(0, activeHintLevel)
 
   function constructResponseRaw(): unknown {
     switch (item.kind) {
@@ -82,9 +91,9 @@ export function ItemPresenter({
           selectedEvidenceIds,
         }
       case 'guided_practice':
-        if (evaluableStage) {
+        if (activeStage) {
           return {
-            stageId: evaluableStage.stageId,
+            stageId: activeStage.stageId,
             responseRaw: textInput,
           }
         }
@@ -128,42 +137,57 @@ export function ItemPresenter({
         resetCapture()
         throw err
       }
+    } else if (item.kind === 'guided_practice' && activeStage) {
+      try {
+        onSubmitResponse(rawResponse, undefined, { guidedStageId: activeStage.stageId })
+      } catch (err) {
+        resetCapture()
+        throw err
+      }
     } else {
-      onSubmitResponse(rawResponse)
+      try {
+        onSubmitResponse(rawResponse)
+      } catch (err) {
+        resetCapture()
+        throw err
+      }
     }
   }
 
-  function toggleEvidence(evId: string) {
-    setValidationError(null)
-    if (selectedEvidenceIds.includes(evId)) {
-      setSelectedEvidenceIds(selectedEvidenceIds.filter((id) => id !== evId))
-    } else {
-      setSelectedEvidenceIds([...selectedEvidenceIds, evId])
-    }
+  function handleAdvanceExpositoryStage() {
+    if (item.kind !== 'guided_practice' || !activeStage) return
+    void onAdvanceGuidedStage?.(activeStage.stageId)
+    setTextInput('')
+    setTimeout(() => {
+      const heading = document.getElementById('guided-stage-title')
+      if (heading) heading.focus()
+    }, 0)
   }
+
+  const isExpositoryStage =
+    activeStage && !getStageCapabilities(activeStage.stageType).requiresAttempt
 
   return (
-    <div className="item-presenter" role="region" aria-label={`Ítem: ${item.title}`}>
-      <header className="item-header">
-        <span className="item-badge">{item.kind}</span>
-        <h3 className="item-title">{item.title}</h3>
-      </header>
+    <div className="item-presenter" role="region" aria-label={`Ejercicio: ${item.title}`}>
+      <div className="item-presenter-header">
+        <span className="badge badge--info">{item.kind.toUpperCase()}</span>
+        <h2 className="item-title">{item.title}</h2>
+      </div>
 
-      {item.context && <p className="item-context">{item.context}</p>}
-
-      {item.task && (
-        <div className="item-task-box">
-          <strong>Tarea:</strong> {item.task}
-        </div>
-      )}
+      <div className="item-context-box">
+        <p className="item-context">{item.context}</p>
+        <p className="item-task">
+          <strong>Consigna:</strong> {item.task}
+        </p>
+      </div>
 
       {visibleHints.length > 0 && (
-        <div className="hints-box" role="region" aria-label="Pistas activadas">
-          <h4>Pistas ({visibleHints.length}):</h4>
+        <div className="hints-box notice-box notice-box--info" role="region" aria-label="Pistas activadas">
+          <h4>Pistas ({visibleHints.length} de {item.hints.length}):</h4>
           <ul>
-            {visibleHints.map((h) => (
-              <li key={h.hintId} className="hint-item">
-                {h.text}
+            {visibleHints.map((hint) => (
+              <li key={hint.hintId}>
+                <strong>Nivel {hint.level}:</strong> {hint.text}
               </li>
             ))}
           </ul>
@@ -171,50 +195,41 @@ export function ItemPresenter({
       )}
 
       {validationError && (
-        <div className="notice-box notice-box--danger" role="alert" aria-live="assertive">
-          <strong>Respuesta requerida:</strong> {validationError}
+        <div className="alert alert--danger mb-3" role="alert">
+          {validationError}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="item-form">
-        {/* Render según el kind del walking skeleton */}
+      {pasteNotice && (
+        <div className="notice-box notice-box--warning mb-3" role="status">
+          ⚠️ Pegado detectado: Se registrará métrica de pegado en el perfil.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
         {item.kind === 'typing_copy' && (
           <div className="input-group">
-            {pasteNotice && (
-              <div className="notice-box notice-box--info" role="status">
-                ℹ Pegado detectado. Se evaluará la precisión final pero no alimentará el perfil de fricción.
-              </div>
-            )}
-            <label htmlFor="typing-input" className="input-label">
-              Texto a copiar:
-            </label>
-            <pre id="typing-target" className="code-display">
+            <div className="target-text-display mb-2 text-mono p-2 bg-subtle" id="typing-target">
               {item.targetText}
-            </pre>
-            <label htmlFor="typing-input" className="input-label">
-              Tu respuesta:
-            </label>
+            </div>
             <input
               id="typing-input"
               type="text"
               className="form-control text-mono"
               value={textInput}
+              onChange={(e) => {
+                setValidationError(null)
+                setTextInput(e.target.value)
+              }}
               onKeyDown={mechanicalCapture.handleKeyDown}
-              onBeforeInput={mechanicalCapture.handleBeforeInput}
               onInput={mechanicalCapture.handleInput}
               onPaste={() => {
                 setPasteNotice(true)
                 mechanicalCapture.handlePaste()
               }}
               onBlur={mechanicalCapture.handleBlur}
-              onCompositionStart={mechanicalCapture.handleCompositionStart}
-              onCompositionEnd={mechanicalCapture.handleCompositionEnd}
-              onChange={(e) => {
-                setValidationError(null)
-                setTextInput(e.target.value)
-              }}
               disabled={disabled}
-              placeholder="Escribí aquí exactamente..."
+              placeholder="Escribí el valor exacto..."
               autoFocus
               autoComplete="off"
             />
@@ -243,183 +258,186 @@ export function ItemPresenter({
           </div>
         )}
 
-        {item.kind === 'exact_question' && (
-          <div id="exact-options-group" tabIndex={-1} className="input-group">
-            {item.answerType === 'single_choice' && item.options && (
-              <div role="radiogroup" aria-label="Opciones de respuesta" className="options-stack">
-                {item.options.map((opt, idx) => (
-                  <label key={opt.optionId} className="radio-card">
-                    <input
-                      id={`exact-option-${String(idx)}`}
-                      type="radio"
-                      name="exactOption"
-                      value={opt.optionId}
-                      checked={singleChoiceId === opt.optionId}
-                      onChange={() => {
-                        setValidationError(null)
-                        setSingleChoiceId(opt.optionId)
-                      }}
-                      disabled={disabled}
-                    />
-                    <span className="radio-text">{opt.text}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {item.answerType === 'multiple_choice' && item.options && (
-              <div role="group" aria-label="Selección múltiple de opciones" className="options-stack">
-                {item.options.map((opt, idx) => (
-                  <label key={opt.optionId} className="checkbox-card">
-                    <input
-                      id={`exact-option-${String(idx)}`}
-                      type="checkbox"
-                      value={opt.optionId}
-                      checked={multipleChoiceIds.includes(opt.optionId)}
-                      onChange={() => {
-                        setValidationError(null)
-                        if (multipleChoiceIds.includes(opt.optionId)) {
-                          setMultipleChoiceIds(multipleChoiceIds.filter((id) => id !== opt.optionId))
-                        } else {
-                          setMultipleChoiceIds([...multipleChoiceIds, opt.optionId])
-                        }
-                      }}
-                      disabled={disabled}
-                    />
-                    <span className="checkbox-text">{opt.text}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {item.answerType === 'short_exact' && (
-              <div className="input-group">
-                <label htmlFor="exact-short-input" className="input-label">
-                  Respuesta exacta:
-                </label>
+        {item.kind === 'exact_question' && item.answerType === 'single_choice' && item.options && (
+          <div className="input-group" role="radiogroup" aria-label="Opciones de respuesta única">
+            {item.options.map((opt) => (
+              <label key={opt.optionId} className="radio-label block mb-2">
                 <input
-                  id="exact-short-input"
-                  type="text"
-                  className="form-control text-mono"
-                  value={textInput}
-                  onChange={(e) => {
+                  type="radio"
+                  name="singleChoice"
+                  value={opt.optionId}
+                  checked={singleChoiceId === opt.optionId}
+                  onChange={() => {
                     setValidationError(null)
-                    setTextInput(e.target.value)
+                    setSingleChoiceId(opt.optionId)
                   }}
                   disabled={disabled}
-                  placeholder="Escribí la respuesta exacta..."
-                  autoFocus
-                  autoComplete="off"
                 />
-              </div>
-            )}
+                <span className="radio-text">{opt.text}</span>
+              </label>
+            ))}
+          </div>
+        )}
 
-            {item.answerType === 'ordered_steps' && item.options && (
-              <div className="ordered-steps-group" aria-label="Ordenamiento de pasos">
-                <p className="section-label">Ordená las etapas con los botones Subir / Bajar:</p>
-                <ol className="ordered-steps-list">
-                  {orderedChoiceIds.map((optId, idx) => {
-                    const optObj = item.options?.find((o) => o.optionId === optId)
-                    return (
-                      <li key={optId} className="ordered-step-item">
-                        <span className="step-number">{idx + 1}.</span>
-                        <span className="step-text">{optObj?.text ?? optId}</span>
-                        <div className="step-actions">
-                          <button
-                            type="button"
-                            className="btn btn--small"
-                            onClick={() => {
-                              setValidationError(null)
-                              if (idx > 0) {
-                                const next = [...orderedChoiceIds]
-                                const curr = next[idx]
-                                const prev = next[idx - 1]
-                                if (curr !== undefined && prev !== undefined) {
-                                  next[idx] = prev
-                                  next[idx - 1] = curr
-                                  setOrderedChoiceIds(next)
-                                }
-                              }
-                            }}
-                            disabled={disabled || idx === 0}
-                            aria-label={`Subir paso ${String(idx + 1)}`}
-                          >
-                            ▲ Subir
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--small"
-                            onClick={() => {
-                              setValidationError(null)
-                              if (idx < orderedChoiceIds.length - 1) {
-                                const next = [...orderedChoiceIds]
-                                const curr = next[idx]
-                                const nextEl = next[idx + 1]
-                                if (curr !== undefined && nextEl !== undefined) {
-                                  next[idx] = nextEl
-                                  next[idx + 1] = curr
-                                  setOrderedChoiceIds(next)
-                                }
-                              }
-                            }}
-                            disabled={disabled || idx === orderedChoiceIds.length - 1}
-                            aria-label={`Bajar paso ${String(idx + 1)}`}
-                          >
-                            ▼ Bajar
-                          </button>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ol>
-              </div>
-            )}
+        {item.kind === 'exact_question' && item.answerType === 'multiple_choice' && item.options && (
+          <div className="input-group" role="group" aria-label="Opciones de respuesta múltiple">
+            {item.options.map((opt) => (
+              <label key={opt.optionId} className="checkbox-label block mb-2">
+                <input
+                  type="checkbox"
+                  value={opt.optionId}
+                  checked={multipleChoiceIds.includes(opt.optionId)}
+                  onChange={(e) => {
+                    setValidationError(null)
+                    if (e.target.checked) {
+                      setMultipleChoiceIds([...multipleChoiceIds, opt.optionId])
+                    } else {
+                      setMultipleChoiceIds(multipleChoiceIds.filter((id) => id !== opt.optionId))
+                    }
+                  }}
+                  disabled={disabled}
+                />
+                <span className="checkbox-text">{opt.text}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {item.kind === 'exact_question' && item.answerType === 'short_exact' && (
+          <div className="input-group">
+            <label htmlFor="short-exact-input" className="input-label">
+              Respuesta exacta:
+            </label>
+            <input
+              id="short-exact-input"
+              type="text"
+              className="form-control text-mono"
+              value={textInput}
+              onChange={(e) => {
+                setValidationError(null)
+                setTextInput(e.target.value)
+              }}
+              disabled={disabled}
+              placeholder="Escribí la respuesta exacta..."
+              autoFocus
+              autoComplete="off"
+            />
+          </div>
+        )}
+
+        {item.kind === 'exact_question' && item.answerType === 'ordered_steps' && (
+          <div className="input-group" role="group" aria-label="Reordenar pasos en secuencia correcta">
+            <p className="input-label">Ordená los pasos de arriba hacia abajo:</p>
+            <ol className="ordered-steps-list">
+              {orderedChoiceIds.map((optId, idx) => {
+                const optObj = item.options?.find((o) => o.optionId === optId)
+                return (
+                  <li key={optId} className="ordered-step-item flex items-center gap-2 mb-2 p-2 bg-subtle border rounded">
+                    <span className="step-number font-bold">{idx + 1}.</span>
+                    <span className="step-text flex-grow">{optObj?.text ?? optId}</span>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      onClick={() => {
+                        if (idx === 0) return
+                        const next = [...orderedChoiceIds]
+                        const prevItem = next[idx - 1]
+                        const currItem = next[idx]
+                        if (prevItem !== undefined && currItem !== undefined) {
+                          next[idx - 1] = currItem
+                          next[idx] = prevItem
+                          setOrderedChoiceIds(next)
+                        }
+                      }}
+                      disabled={disabled || idx === 0}
+                      aria-label={`Mover "${optObj?.text ?? optId}" hacia arriba`}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      onClick={() => {
+                        if (idx === orderedChoiceIds.length - 1) return
+                        const next = [...orderedChoiceIds]
+                        const nextItem = next[idx + 1]
+                        const currItem = next[idx]
+                        if (nextItem !== undefined && currItem !== undefined) {
+                          next[idx + 1] = currItem
+                          next[idx] = nextItem
+                          setOrderedChoiceIds(next)
+                        }
+                      }}
+                      disabled={disabled || idx === orderedChoiceIds.length - 1}
+                      aria-label={`Mover "${optObj?.text ?? optId}" hacia abajo`}
+                    >
+                      ▼
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
           </div>
         )}
 
         {item.kind === 'open_question' && (
           <div className="input-group">
-            <div className="notice-box notice-box--info" role="status">
-              ℹ Esta respuesta se registrará como <strong>pendiente de revisión</strong>.
-            </div>
-            <label htmlFor="open-textarea" className="input-label">
-              Tu explicación:
+            <label htmlFor="open-question-textarea" className="input-label">
+              Respuesta libre:
             </label>
             <textarea
-              id="open-textarea"
-              className="form-control textarea-input"
-              rows={item.maxResponse.lines ?? 4}
-              maxLength={item.maxResponse.characters}
+              id="open-question-textarea"
+              className="form-control"
+              rows={4}
               value={openText}
               onChange={(e) => {
                 setValidationError(null)
                 setOpenText(e.target.value)
               }}
               disabled={disabled}
-              placeholder="Explicá tu análisis en 2 o 3 frases..."
-              autoFocus
+              placeholder="Escribí tu respuesta justificada aquí..."
             />
-            {item.maxResponse.characters !== undefined && (
-              <div className="char-counter" aria-live="polite">
-                {String(openText.length)} / {String(item.maxResponse.characters)} caracteres
-              </div>
-            )}
+            <span className="character-counter text-subtle text-sm">
+              Caracteres: {openText.length} / {String(item.maxResponse.characters)}
+            </span>
+
+            <div className="rubric-box notice-box notice-box--info mt-3" role="region" aria-label="Rúbrica de autoevaluación">
+              <h4>Rúbrica de orientación:</h4>
+              <p>
+                <strong>Criterio:</strong> {item.rubric.verificationCriterion}
+              </p>
+              {item.rubric.essentialElements.length > 0 && (
+                <div>
+                  <strong>Elementos recomendados:</strong>
+                  <ul>
+                    {item.rubric.essentialElements.map((el, rIdx) => (
+                      <li key={rIdx}>{el}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {item.kind === 'decision' && (
           <div className="input-group">
-            {Array.isArray(item.evidence) && item.evidence.length > 0 && (
-              <div id="decision-evidence-group" tabIndex={-1} className="evidence-section">
-                <p className="section-label">Evidencia observada:</p>
-                {item.evidence.map((ev, idx) => (
-                  <label key={ev.evidenceId} className="checkbox-card">
+            {item.evidence.length > 0 && (
+              <div className="evidence-section mb-3">
+                <p className="input-label">Evidencia disponible (seleccioná las aplicables):</p>
+                {item.evidence.map((ev) => (
+                  <label key={ev.evidenceId} className="checkbox-label block mb-2">
                     <input
-                      id={`decision-evidence-${String(idx)}`}
                       type="checkbox"
+                      value={ev.evidenceId}
                       checked={selectedEvidenceIds.includes(ev.evidenceId)}
-                      onChange={() => {
-                        toggleEvidence(ev.evidenceId)
+                      onChange={(e) => {
+                        setValidationError(null)
+                        if (e.target.checked) {
+                          setSelectedEvidenceIds([...selectedEvidenceIds, ev.evidenceId])
+                        } else {
+                          setSelectedEvidenceIds(selectedEvidenceIds.filter((id) => id !== ev.evidenceId))
+                        }
                       }}
                       disabled={disabled}
                     />
@@ -429,18 +447,11 @@ export function ItemPresenter({
               </div>
             )}
 
-            <div
-              id="decision-choices-group"
-              tabIndex={-1}
-              className="choices-section"
-              role="radiogroup"
-              aria-label="Opciones de decisión"
-            >
-              <p className="section-label">Seleccioná tu decisión:</p>
-              {item.choices.map((ch, idx) => (
-                <label key={ch.choiceId} htmlFor={`decision-choice-${String(idx)}`} className="radio-card">
+            <div className="choices-section" role="radiogroup" aria-label="Elección táctica de decisión">
+              <p className="input-label">Elección táctica (opción única):</p>
+              {item.choices.map((ch) => (
+                <label key={ch.choiceId} className="radio-label block mb-2">
                   <input
-                    id={`decision-choice-${String(idx)}`}
                     type="radio"
                     name="decisionChoice"
                     value={ch.choiceId}
@@ -460,44 +471,67 @@ export function ItemPresenter({
 
         {item.kind === 'guided_practice' && (
           <div className="input-group">
-            {evaluableStage ? (
+            {activeStageResult?.activeStage ? (
               <>
                 <div className="guided-summary">
-                  <p>
-                    <strong>Etapa activa:</strong> {evaluableStage.title}
-                  </p>
-                  <p className="guided-content">{evaluableStage.content}</p>
+                  <h3 id="guided-stage-title" tabIndex={-1} className="guided-stage-heading font-bold text-lg mb-2">
+                    Etapa {activeStageResult.activeStageIndex + 1} de{' '}
+                    {activeStageResult.immediateStagesCount} —{' '}
+                    {activeStageResult.activeStage.title}
+                  </h3>
+                  <div className="guided-content p-3 bg-subtle rounded border mb-3">{activeStageResult.activeStage.content}</div>
                 </div>
-                <label htmlFor="guided-input" className="input-label">
-                  Respuesta:
-                </label>
-                <input
-                  id="guided-input"
-                  type="text"
-                  className="form-control text-mono"
-                  value={textInput}
-                  onChange={(e) => {
-                    setValidationError(null)
-                    setTextInput(e.target.value)
-                  }}
-                  disabled={disabled}
-                  placeholder="Escribí la respuesta de la etapa..."
-                  autoFocus
-                  autoComplete="off"
-                />
+
+                {!isExpositoryStage && (
+                  <>
+                    {attemptsCountForActiveStage >= 1 && (
+                      <div className="notice-box notice-box--warning mb-3" role="status">
+                        💡 Corrección asistida (2.º intento) — Probá ajustar tu respuesta o aplicá la pista.
+                      </div>
+                    )}
+                    <label htmlFor="guided-input" className="input-label">
+                      Respuesta:
+                    </label>
+                    <input
+                      id="guided-input"
+                      type="text"
+                      className="form-control text-mono"
+                      value={textInput}
+                      onChange={(e) => {
+                        setValidationError(null)
+                        setTextInput(e.target.value)
+                      }}
+                      disabled={disabled}
+                      placeholder="Escribí la respuesta de la etapa..."
+                      autoFocus
+                      autoComplete="off"
+                    />
+                  </>
+                )}
               </>
             ) : (
-              <div className="notice-box notice-box--danger" role="alert">
-                No se encontró una etapa evaluable compatible en este ítem guiado.
+              <div className="notice-box notice-box--success" role="status">
+                ✔ Secuencia guiada completada.
               </div>
             )}
           </div>
         )}
 
         <div className="item-submit-row">
-          <button type="submit" className="btn btn--primary" disabled={disabled}>
-            Enviar respuesta
-          </button>
+          {item.kind === 'guided_practice' && isExpositoryStage ? (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={handleAdvanceExpositoryStage}
+              disabled={disabled}
+            >
+              Continuar
+            </button>
+          ) : (
+            <button type="submit" className="btn btn--primary" disabled={disabled || Boolean(activeStageResult?.isCompleted)}>
+              Enviar respuesta
+            </button>
+          )}
         </div>
       </form>
     </div>

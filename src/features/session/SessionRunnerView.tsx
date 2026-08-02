@@ -4,6 +4,10 @@ import { ItemPresenter } from './ItemPresenter'
 import { ItemFeedbackView } from './ItemFeedbackView'
 import { SessionSummaryView } from './SessionSummaryView'
 
+import { deriveActiveGuidedStage, type GuidedItemProgressRecord } from '../../domain/learning/guidedState'
+import { advanceExpositoryGuidedStage } from '../../data/services/transactionalSessionService'
+import type { TypeOpsDatabase } from '../../data/db/database'
+
 interface SessionRunnerViewProps {
   state: SessionUIState
   onSubmitResponse: (responseRaw: unknown, durationMs: number) => void
@@ -12,6 +16,7 @@ interface SessionRunnerViewProps {
   onFinishSession: () => void
   onExitSession: (saveAsAbandoned?: boolean) => void
   onRetryCloseSession?: () => void
+  db?: TypeOpsDatabase | undefined
 }
 
 export function SessionRunnerView({
@@ -22,14 +27,27 @@ export function SessionRunnerView({
   onFinishSession,
   onExitSession,
   onRetryCloseSession,
+  db,
 }: SessionRunnerViewProps) {
   const [showExitModal, setShowExitModal] = useState(false)
   const [itemStartTime, setItemStartTime] = useState<number>(Date.now())
   const [remainingTimeSeconds, setRemainingTimeSeconds] = useState<number | null>(null)
+  const [guidedProgressRecord, setGuidedProgressRecord] = useState<GuidedItemProgressRecord | null>(null)
 
   const currentPlanItem = state.sessionPlan?.items[state.currentPlanIndex]
   const currentItem = currentPlanItem?.item
   const totalItems = state.sessionPlan?.items.length ?? 0
+
+  useEffect(() => {
+    if (currentItem?.kind !== 'guided_practice' || !db || !state.sessionRecord) {
+      setGuidedProgressRecord(null)
+      return
+    }
+    const key = `${state.sessionRecord.packId}:${state.sessionRecord.packVersion}:${currentItem.itemId}`
+    void db.guidedProgress.get(key).then((rec) => {
+      setGuidedProgressRecord(rec ?? null)
+    })
+  }, [currentItem, db, state.sessionRecord])
 
   // Actualizar inicio de tiempo por ítem cuando cambia el índice
   useEffect(() => {
@@ -99,6 +117,25 @@ export function SessionRunnerView({
   function handleSkipItem() {
     handleFormSubmit({ isSkipped: true })
   }
+
+  const handleAdvanceGuidedStage = async (stageId: string) => {
+    if (!db || !state.sessionRecord || !currentItem || currentItem.kind !== 'guided_practice') return
+    const res = await advanceExpositoryGuidedStage({
+      db,
+      sessionId: state.sessionRecord.sessionId,
+      item: currentItem,
+      packId: state.sessionRecord.packId,
+      packVersion: state.sessionRecord.packVersion,
+      stageId,
+    })
+    setGuidedProgressRecord(res.guidedProgress)
+  }
+
+  const activeStageResult = currentItem?.kind === 'guided_practice' ? deriveActiveGuidedStage(currentItem, guidedProgressRecord) : null
+  const activeStageId = activeStageResult?.activeStage?.stageId
+  const attemptsCountForActiveStage = activeStageId
+    ? state.submittedAttempts.filter((a) => a.itemId === currentItem?.itemId && a.guidedStageId === activeStageId).length
+    : 0
 
   if (state.status === 'empty_plan') {
     return (
@@ -183,49 +220,48 @@ export function SessionRunnerView({
 
       {/* Contenido principal: presentación o feedback */}
       <main className="runner-main">
-        {state.status === 'active' && currentItem && (() => {
-          const canHaveHints = currentItem.kind !== 'typing_copy' && currentItem.hints.length > 0
-          const remainingHints = currentItem.hints.length - state.activeHintLevel
-          const hasRemainingHints = remainingHints > 0
+        {state.status === 'active' && currentItem && (
+          <>
+            <ItemPresenter
+              item={currentItem}
+              activeHintLevel={state.activeHintLevel}
+              onSubmitResponse={handleFormSubmit}
+              onAdvanceGuidedStage={handleAdvanceGuidedStage}
+              guidedProgress={guidedProgressRecord}
+              attemptsCountForActiveStage={attemptsCountForActiveStage}
+            />
 
-          return (
-            <>
-              <ItemPresenter
-                item={currentItem}
-                activeHintLevel={state.activeHintLevel}
-                onSubmitResponse={handleFormSubmit}
-              />
-
-              {/* Fila de controles de acción secundarios (HTML botones reales - AC-25) */}
-              <div className="runner-controls-bar">
-                {canHaveHints && (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={onUseHint}
-                    disabled={!hasRemainingHints}
-                    aria-label={
-                      hasRemainingHints
-                        ? 'Pedir pista (Alt+H)'
-                        : 'No quedan más pistas disponibles para este ejercicio'
-                    }
-                  >
-                    {hasRemainingHints ? `Pedir pista (${String(remainingHints)} restantes)` : 'Sin más pistas disponibles'}
-                  </button>
-                )}
-
+            {/* Fila de controles de acción secundarios (HTML botones reales - AC-25) */}
+            <div className="runner-controls-bar">
+              {currentItem.kind !== 'typing_copy' && currentItem.hints.length > 0 && (
                 <button
                   type="button"
                   className="btn btn--secondary"
-                  onClick={handleSkipItem}
-                  aria-label="Omitir ejercicio"
+                  onClick={onUseHint}
+                  disabled={currentItem.hints.length - state.activeHintLevel <= 0}
+                  aria-label={
+                    currentItem.hints.length - state.activeHintLevel > 0
+                      ? 'Pedir pista (Alt+H)'
+                      : 'No quedan más pistas disponibles para este ejercicio'
+                  }
                 >
-                  Omitir ejercicio
+                  {currentItem.hints.length - state.activeHintLevel > 0
+                    ? `Pedir pista (${String(currentItem.hints.length - state.activeHintLevel)} restantes)`
+                    : 'Sin más pistas disponibles'}
                 </button>
-              </div>
-            </>
-          )
-        })()}
+              )}
+
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={handleSkipItem}
+                aria-label="Omitir ejercicio"
+              >
+                Omitir ejercicio
+              </button>
+            </div>
+          </>
+        )}
 
         {state.status === 'item_feedback' && currentItem && state.lastSubmittedAttempt && (
           <ItemFeedbackView

@@ -157,16 +157,48 @@ export const GuidedStageTypeSchema = z.enum([
   'later_variant',
 ])
 
+export const GuidedCommandAnswerSpecSchema = z
+  .object({
+    kind: z.literal('command'),
+    acceptedAlternatives: z
+      .array(z.string().min(1, 'La alternativa no puede estar vacía'))
+      .min(1, 'acceptedAlternatives debe tener al menos 1 elemento')
+      .refine((alts) => alts.every((a) => a.trim().length > 0), {
+        message: 'Las alternativas no pueden contener únicamente espacios en blanco',
+      }),
+    normalization: z.array(
+      z.enum(['trim_outer', 'line_endings', 'spaces_outside_quotes']),
+    ),
+    unrecognizedPolicy: z.literal('needs_review'),
+  })
+  .strict()
+
 export const GuidedStageSchema = z
   .object({
     stageId: z.string().min(1, 'stageId no puede estar vacío'),
     stageType: GuidedStageTypeSchema,
     title: z.string().min(1, 'title no puede estar vacío'),
     content: z.string().min(1, 'content no puede estar vacío'),
-    expectedAction: z.string().optional(),
+    expectedAction: GuidedCommandAnswerSpecSchema.optional(),
     advancementCriterion: z.string().optional(),
   })
   .strict()
+  .superRefine((stage, ctx) => {
+    const requiresAction = stage.stageType === 'guided_exercise' || stage.stageType === 'unassisted_exercise'
+    if (requiresAction && !stage.expectedAction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `La etapa '${stage.stageId}' de tipo '${stage.stageType}' requiere definir expectedAction.`,
+        path: ['expectedAction'],
+      })
+    } else if (!requiresAction && stage.expectedAction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `La etapa '${stage.stageId}' de tipo '${stage.stageType}' no debe definir expectedAction.`,
+        path: ['expectedAction'],
+      })
+    }
+  })
 
 export const GuidedPathSchema = z
   .object({

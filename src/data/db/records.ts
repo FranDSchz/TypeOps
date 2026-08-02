@@ -77,7 +77,11 @@ export interface AttemptRecord {
   createdAt: string
   /** Observación mecánica inmutable consolidada de Subhito 5B */
   mechanicalObservation?: MechanicalObservation
+  /** Identificador opcional de etapa para práctica guiada (Subhito 5C) */
+  guidedStageId?: string
 }
+
+export type { GuidedItemProgressRecord } from '../../domain/learning/guidedState'
 
 export interface MechanicalProfileRecord {
   /** Clave primaria `${packId}:${packVersion}` */

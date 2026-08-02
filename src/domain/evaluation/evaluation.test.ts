@@ -85,21 +85,17 @@ describe('Domain Evaluation Engine (Hito 3)', () => {
     expect(resPartial.errorCodes).toContain('verification_missing')
   })
 
-  it('evalúa etapas de guided_practice retornando status not_assessed y dimensiones not_assessed', () => {
+  it('evalúa etapas de guided_practice con la semántica determinista de 5C', () => {
     const resStage1 = evaluateContentItem(guidedItem, { stageId: 'stg-1' })
     expect(resStage1.status).toBe('not_assessed')
     expect(resStage1.feedbackCode).toBe('GUIDED_STAGE_READ_COMPLETE')
-    expect(resStage1.dimensionResults.concept).toBe('not_assessed')
-    expect(resStage1.dimensionResults.syntax).toBe('not_assessed')
 
     const resStage4Recorded = evaluateContentItem(guidedItem, { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' })
-    expect(resStage4Recorded.status).toBe('not_assessed')
-    expect(resStage4Recorded.feedbackCode).toBe('GUIDED_STAGE_RECORDED')
-    expect(resStage4Recorded.dimensionResults.concept).toBe('not_assessed')
+    expect(resStage4Recorded.status).toBe('correct')
+    expect(resStage4Recorded.feedbackCode).toBe('GUIDED_STAGE_CORRECT')
 
     const resStage4Empty = evaluateContentItem(guidedItem, { stageId: 'stg-4', responseRaw: '' })
     expect(resStage4Empty.status).toBe('not_assessed')
     expect(resStage4Empty.feedbackCode).toBe('GUIDED_STAGE_RESPONSE_EMPTY')
-    expect(resStage4Empty.dimensionResults.concept).toBe('not_assessed')
   })
 })

@@ -355,7 +355,8 @@ export function validateContentPackCrossReferences(
     }
 
     if (item.kind === 'guided_practice' && item.laterVariantItemId) {
-      if (!itemIds.has(item.laterVariantItemId)) {
+      const targetItem = pack.items.find((i) => i.itemId === item.laterVariantItemId)
+      if (!targetItem) {
         errors.push(
           createValidationError({
             packId: pack.packId,
@@ -365,17 +366,52 @@ export function validateContentPackCrossReferences(
             message: `Ítem de variante posterior inexistente: '${item.laterVariantItemId}' en ítem '${item.itemId}'`,
           }),
         )
-      }
-      if (item.laterVariantItemId === item.itemId) {
-        errors.push(
-          createValidationError({
-            packId: pack.packId,
-            itemId: item.itemId,
-            path: `items[${iIdxStr}].laterVariantItemId`,
-            code: 'INVALID_REFERENCE',
-            message: `laterVariantItemId en '${item.itemId}' no puede autoreferenciarse`,
-          }),
-        )
+      } else {
+        if (targetItem.itemId === item.itemId) {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              itemId: item.itemId,
+              path: `items[${iIdxStr}].laterVariantItemId`,
+              code: 'INVALID_REFERENCE',
+              message: `laterVariantItemId en '${item.itemId}' no puede autoreferenciarse`,
+            }),
+          )
+        }
+        if (!targetItem.enabled) {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              itemId: item.itemId,
+              path: `items[${iIdxStr}].laterVariantItemId`,
+              code: 'DISABLED_REFERENCE',
+              message: `El ítem de variante posterior '${item.laterVariantItemId}' está deshabilitado`,
+            }),
+          )
+        }
+        if (targetItem.kind === 'guided_practice') {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              itemId: item.itemId,
+              path: `items[${iIdxStr}].laterVariantItemId`,
+              code: 'INVALID_MODE_REFERENCE',
+              message: `El ítem de variante posterior '${item.laterVariantItemId}' no puede ser de tipo o modo 'guided'`,
+            }),
+          )
+        }
+        const hasCommonUnit = item.unitIds.some((u) => targetItem.unitIds.includes(u))
+        if (!hasCommonUnit) {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              itemId: item.itemId,
+              path: `items[${iIdxStr}].laterVariantItemId`,
+              code: 'UNIT_MISMATCH',
+              message: `El ítem de variante posterior '${item.laterVariantItemId}' no comparte ninguna unidad con '${item.itemId}'`,
+            }),
+          )
+        }
       }
     }
   })

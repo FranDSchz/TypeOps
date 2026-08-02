@@ -35,6 +35,21 @@ export const MechanicalProfileRecordSchema = z
   })
   .strict()
 
+export const GuidedItemProgressRecordSchema = z
+  .object({
+    progressKey: z.string().min(1),
+    packId: z.string().min(1),
+    packVersion: z.string().min(1),
+    itemId: z.string().min(1),
+    completedStageIds: z.array(z.string()),
+    updatedAt: z.string().regex(isoDateRegex, 'updatedAt debe ser fecha ISO 8601'),
+  })
+  .strict()
+  .refine(
+    (rec) => rec.progressKey === `${rec.packId}:${rec.packVersion}:${rec.itemId}`,
+    { message: 'progressKey no coincide con packId, packVersion e itemId' },
+  )
+
 export const TypeOpsExportEnvelopeSchema = z
   .object({
     format: z.literal('typeops-export', {
@@ -54,6 +69,7 @@ export const TypeOpsExportEnvelopeSchema = z
       .strict()
       .optional(),
     mechanicalProfiles: z.array(MechanicalProfileRecordSchema).optional(),
+    guidedProgress: z.array(GuidedItemProgressRecordSchema).optional(),
     integrity: IntegrityManifestSchema,
   })
   .strict()
@@ -132,6 +148,10 @@ export function loadExportEnvelope(input: unknown): LoadEnvelopeResult {
 
   if (rawEnvelope.mechanicalProfiles !== undefined) {
     envelope.mechanicalProfiles = rawEnvelope.mechanicalProfiles
+  }
+
+  if (rawEnvelope.guidedProgress !== undefined) {
+    envelope.guidedProgress = rawEnvelope.guidedProgress
   }
 
   if (rawEnvelope.settings !== undefined) {

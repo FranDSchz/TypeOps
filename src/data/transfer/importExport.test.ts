@@ -265,5 +265,54 @@ describe('Transfer Services — Import, Export, Conflict Policy & Atomic Rollbac
       expect(preview.valid).toBe(false)
       expect(preview.errors.length).toBeGreaterThan(0)
     })
+
+    it('Backup v4: exporta y restaura registros de guidedProgress correctamente', async () => {
+      await bootstrapOfficialContent(testDb)
+
+      const guidedRecord = {
+        progressKey: 'typeops-foundations-es-ar:1.0.0:guided-tail-intro',
+        packId: 'typeops-foundations-es-ar',
+        packVersion: '1.0.0',
+        itemId: 'guided-tail-intro',
+        completedStageIds: ['stg-1', 'stg-2', 'stg-3'],
+        updatedAt: '2026-08-02T10:00:00.000Z',
+      }
+      await testDb.guidedProgress.put(guidedRecord)
+
+      const backup = await exportFullBackup(testDb)
+      expect(backup.guidedProgress).toBeDefined()
+      expect(backup.guidedProgress).toHaveLength(1)
+
+      await testDb.guidedProgress.clear()
+      expect(await testDb.guidedProgress.count()).toBe(0)
+
+      const preview = await generateImportPreview(backup, testDb)
+      const result = await confirmImport(preview, testDb)
+      expect(result.success).toBe(true)
+
+      const restored = await testDb.guidedProgress.get('typeops-foundations-es-ar:1.0.0:guided-tail-intro')
+      expect(restored).toBeDefined()
+      expect(restored?.completedStageIds).toEqual(['stg-1', 'stg-2', 'stg-3'])
+    })
+
+    it('Rechaza sobre con guidedProgress donde progressKey no coincide con packId, packVersion e itemId', async () => {
+      await bootstrapOfficialContent(testDb)
+
+      const backupRaw = (await exportFullBackup(testDb)) as unknown as Record<string, unknown>
+      backupRaw.guidedProgress = [
+        {
+          progressKey: 'mismatch-key',
+          packId: 'pack-1',
+          packVersion: '1.0.0',
+          itemId: 'guided-item-1',
+          completedStageIds: ['stg-1'],
+          updatedAt: '2026-08-02T10:00:00.000Z',
+        },
+      ]
+
+      const preview = await generateImportPreview(backupRaw, testDb)
+      expect(preview.valid).toBe(false)
+      expect(preview.errors.some((e) => e.message.includes('progressKey no coincide'))).toBe(true)
+    })
   })
 })

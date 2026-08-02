@@ -157,8 +157,8 @@ describe('ItemPresenter — Controles y Payloads Subhito 5A (RTL & Integración)
       expect(screen.getByText('Paso Dos')).toBeInTheDocument()
       expect(screen.getByText('Paso Tres')).toBeInTheDocument()
 
-      const upButtons = screen.getAllByRole('button', { name: /Subir paso/i })
-      const downButtons = screen.getAllByRole('button', { name: /Bajar paso/i })
+      const upButtons = screen.getAllByRole('button', { name: /hacia arriba/i })
+      const downButtons = screen.getAllByRole('button', { name: /hacia abajo/i })
 
       // El primer botón de subir y el último botón de bajar deben estar deshabilitados
       expect(upButtons[0]).toBeDisabled()
@@ -288,16 +288,16 @@ describe('ItemPresenter — Controles y Payloads Subhito 5A (RTL & Integración)
 
       render(<ItemPresenter item={openItem} activeHintLevel={0} onSubmitResponse={onSubmit} />)
 
-      const textarea = screen.getByRole('textbox', { name: 'Tu explicación:' })
+      const textarea = screen.getByRole('textbox', { name: 'Respuesta libre:' })
       expect(textarea).toBeInTheDocument()
-      expect(screen.getByText(/0 \/ 200 caracteres/)).toBeInTheDocument()
+      expect(screen.getByText((_, el) => (el ? el.classList.contains('character-counter') && el.textContent.includes('0 / 200') : false))).toBeInTheDocument()
 
       // Bloqueo de respuesta vacía
       await user.click(screen.getByRole('button', { name: /Enviar respuesta/i }))
       expect(screen.getByRole('alert')).toHaveTextContent('Debés escribir una explicación antes de enviar.')
 
       await user.type(textarea, 'Explicación detallada de análisis de seguridad.')
-      expect(screen.getByText(/47 \/ 200 caracteres/)).toBeInTheDocument()
+      expect(screen.getByText((_, el) => (el ? el.classList.contains('character-counter') && el.textContent.includes('47 / 200') : false))).toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: /Enviar respuesta/i }))
       expect(onSubmit).toHaveBeenCalledWith('Explicación detallada de análisis de seguridad.')
@@ -310,7 +310,7 @@ describe('ItemPresenter — Controles y Payloads Subhito 5A (RTL & Integración)
       render(<ItemFeedbackView item={openItem} evaluationResult={evalRes} onContinue={() => {}} />)
       expect(screen.getByText('📝 Respuesta guardada (Pendiente de revisión)')).toBeInTheDocument()
       expect(screen.getByText(/Rúbrica de autoevaluación \(opcional\):/i)).toBeInTheDocument()
-      expect(screen.getByText('Criterio de verificación de prueba')).toBeInTheDocument()
+      expect(screen.getAllByText('Criterio de verificación de prueba').length).toBeGreaterThan(0)
       // No existe ningún botón ni radio de calificación que afecte el dominio
       expect(screen.queryByRole('radio')).toBeNull()
     })

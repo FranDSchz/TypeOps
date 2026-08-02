@@ -22,12 +22,14 @@ export function ItemFeedbackView({ item, evaluationResult, onContinue }: ItemFee
   } else if (isGuided) {
     if (evaluationResult.feedbackCode === 'GUIDED_STAGE_READ_COMPLETE') {
       bannerTitle = '📝 Etapa revisada'
-    } else if (evaluationResult.feedbackCode === 'GUIDED_STAGE_RECORDED') {
-      bannerTitle = '📝 Práctica registrada'
+    } else if (evaluationResult.feedbackCode === 'GUIDED_STAGE_CORRECT') {
+      bannerTitle = '✔ Respuesta correcta para la etapa'
+    } else if (evaluationResult.feedbackCode === 'GUIDED_STAGE_NEEDS_REVIEW') {
+      bannerTitle = '💬 Respuesta registrada (Pendiente de revisión)'
     } else if (evaluationResult.status === 'incorrect') {
       bannerTitle = '✖ Respuesta incorrecta para la etapa'
     } else {
-      bannerTitle = '📝 Práctica registrada'
+      bannerTitle = '📝 Práctica guiada registrada'
     }
   } else if (isOpenQuestion) {
     bannerTitle = '📝 Respuesta guardada (Pendiente de revisión)'

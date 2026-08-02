@@ -154,6 +154,7 @@ export function App() {
 
         {state.status !== 'idle' && state.status !== 'configuring' && (
           <SessionRunnerView
+            db={db}
             state={state}
             onSubmitResponse={(responseRaw, durationMs) => {
               void submitResponse(responseRaw, durationMs)

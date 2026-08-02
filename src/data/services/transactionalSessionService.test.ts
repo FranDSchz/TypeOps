@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createTestDatabase, type TypeOpsDatabase } from '../db/database'
-import { submitAttempt } from './transactionalSessionService'
+import { submitAttempt, advanceExpositoryGuidedStage } from './transactionalSessionService'
 import officialPack from '../../content/typeops-foundations-es-ar/pack.json'
-import type { ContentPack, ContentItem } from '../../domain/content/types'
+import type { ContentPack, ContentItem, GuidedPracticeItem } from '../../domain/content/types'
 import type { SessionRecord, LearningProgressRecord } from '../db/records'
 import { recommendNextItem } from '../../domain/recommendation/recommendationEngine'
 
@@ -53,23 +53,10 @@ describe('TransactionalSessionService (Saneamiento V1)', () => {
     })
 
     expect(result.attempt.attemptId).toBe(attemptId)
-    expect(result.attempt.workflowStatus).toBe('guided_step_recorded')
-    expect(result.evaluationResult.status).toBe('not_assessed')
-    expect(result.evaluationResult.feedbackCode).toBe('GUIDED_STAGE_RECORDED')
-    expect(result.evaluationResult.dimensionResults.concept).toBe('not_assessed')
-
-    // Avanza el currentIndex de la sesión a 1
-    const session = await testDb.sessions.get('sess-test-1')
-    expect(session?.currentIndex).toBe(1)
-
-    // Transiciona a learning con 0 éxitos independientes
-    const compositeUnitKey = `${pack.packId}:unit-log-inspection`
-    const progress = await testDb.learningProgress.get(compositeUnitKey)
-    expect(progress?.state).toBe('learning')
-    expect(progress?.independentSuccessesCount).toBe(0)
+    expect(result.attempt.workflowStatus).toBe('evaluated')
   })
 
-  it('2. Respuesta esperada en guided ("tail -n 20 /var/log/auth.log"): comportamiento neutral guided_step_recorded con 0 éxitos independientes', async () => {
+  it('2. Respuesta esperada en guided ("tail -n 20 /var/log/auth.log"): comportamiento en 5C', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
     const attemptId = 'att-guided-expected'
 
@@ -80,19 +67,20 @@ describe('TransactionalSessionService (Saneamiento V1)', () => {
       item: guidedItem,
       packId: pack.packId,
       packVersion: pack.packVersion,
-      responseRaw: 'tail -n 20 /var/log/auth.log',
+      responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+      evaluationOptions: { guidedStageId: 'stg-4' },
       durationMs: 5000,
     })
 
-    expect(result.attempt.workflowStatus).toBe('guided_step_recorded')
-    expect(result.evaluationResult.status).toBe('not_assessed')
+    expect(result.attempt.workflowStatus).toBe('evaluated')
+    expect(result.evaluationResult.status).toBe('correct')
 
     const session = await testDb.sessions.get('sess-test-1')
-    expect(session?.currentIndex).toBe(1)
+    expect(session?.currentIndex).toBe(0)
 
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
-    expect(progress?.state).toBe('learning')
+    expect(progress?.state).toBe('practicing')
     expect(progress?.independentSuccessesCount).toBe(0)
   })
 
@@ -120,7 +108,8 @@ describe('TransactionalSessionService (Saneamiento V1)', () => {
 
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
-    expect(progress).toBeUndefined()
+    expect(progress?.state).toBe('learning')
+    expect(progress?.independentSuccessesCount).toBe(0)
   })
 
   it('4. Invocación directa con respuesta vacía: arroja error previo a la transacción y no realiza escrituras parciales', async () => {
@@ -507,6 +496,381 @@ describe('TransactionalSessionService (Saneamiento V1)', () => {
       const profileKey = `${pack.packId}:${pack.packVersion}`
       const profile = await testDb.mechanicalProfiles.get(profileKey)
       expect(profile).toBeUndefined()
+    })
+  })
+
+  describe('Práctica Guiada Vertical — Transacciones, Reanudación e Idempotencia (Subhito 5C)', () => {
+    const guidedItem = officialPack.items.find((i) => i.kind === 'guided_practice') as GuidedPracticeItem
+
+    beforeEach(async () => {
+      await testDb.sessions.put({
+        sessionId: 'sess-guided-1',
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        mode: 'guided',
+        presetName: '5_minutes',
+        startedAt: new Date().toISOString(),
+        deadlineAt: null,
+        planItems: [{ itemId: guidedItem.itemId, unitId: guidedItem.unitIds[0] ?? 'unit-log', reasonCode: 'new_needs_guidance', reasonDescription: 'Test' }],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    })
+
+    it('A. advanceExpositoryGuidedStage: avanza etapas expositivas de forma idempotente sin avanzar el índice de sesión', async () => {
+      // 1. Avanzar etapa 1 (model)
+      const res1 = await advanceExpositoryGuidedStage({
+        db: testDb,
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        stageId: 'stg-1',
+      })
+
+      expect(res1.guidedProgress.completedStageIds).toEqual(['stg-1'])
+      expect(res1.activeStageResult.activeStage?.stageId).toBe('stg-2')
+
+      // Verificar que el índice de sesión sigue en 0
+      const session1 = await testDb.sessions.get('sess-guided-1')
+      expect(session1?.currentIndex).toBe(0)
+
+      // 2. Doble click idempotente en la misma etapa 1 no duplica el arreglo de etapas completadas
+      const res1Repeat = await advanceExpositoryGuidedStage({
+        db: testDb,
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        stageId: 'stg-1',
+      })
+      expect(res1Repeat.guidedProgress.completedStageIds).toEqual(['stg-1'])
+    })
+
+    it('B. guided_exercise: 1er intento incorrecto deja la etapa incompleta para reintento; 2do intento la completa sin éxito independiente', async () => {
+      // Avanzar etapas expositivas 1, 2 y 3
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+
+      // 1. Primer intento incorrecto en stg-4
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg4-try1',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'comando_incorrecto_1' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      // El primer intento no completa la etapa 4 para permitir el reintento asistido
+      const progress1 = await testDb.guidedProgress.get(`${pack.packId}:${pack.packVersion}:${guidedItem.itemId}`)
+      expect(progress1?.completedStageIds).not.toContain('stg-4')
+
+      // 2. Segundo intento (reintento asistido) en stg-4
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg4-try2',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'comando_incorrecto_2' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      // El segundo intento agota la asistencia y completa stg-4
+      const progress2 = await testDb.guidedProgress.get(`${pack.packId}:${pack.packVersion}:${guidedItem.itemId}`)
+      expect(progress2?.completedStageIds).toContain('stg-4')
+
+      // Verificar que NO otorgó éxitos independientes
+      const compositeKey = `${pack.packId}:${guidedItem.unitIds[0] ?? ''}`
+      const learning = await testDb.learningProgress.get(compositeKey)
+      expect(learning?.independentSuccessesCount).toBe(0)
+    })
+
+    it('C. unassisted_exercise: intento correcto completa el ítem, otorga 1 éxito independiente y avanza la sesión', async () => {
+      // Completar etapas 1 a 4
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+
+      // Resolver stg-4 correctamente
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg4-ok',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      // Resolver stg-5 correctamente
+      const resStg5 = await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg5-ok',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-5', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-5' },
+        durationMs: 2000,
+      })
+
+      expect(resStg5.isSessionCompleted).toBe(true)
+
+      // Éxito independiente acreditado exactamente en 1
+      const compositeKey = `${pack.packId}:${guidedItem.unitIds[0] ?? ''}`
+      const learning = await testDb.learningProgress.get(compositeKey)
+      expect(learning?.state).toBe('practicing')
+      expect(learning?.independentSuccessesCount).toBe(1)
+
+      // La sesión avanzó a completada
+      const session = await testDb.sessions.get('sess-guided-1')
+      expect(session?.currentIndex).toBe(1)
+      expect(session?.status).toBe('completed')
+    })
+
+    it('D. Idempotencia de Etapa Guiada Completada (Mandato 7): un intento con nuevo attemptId sobre una etapa ya completada es un NO-OP seguro', async () => {
+      // Completar etapas 1 a 5
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-1', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg4-ok2',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg5-ok2',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-5', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-5' },
+        durationMs: 2000,
+      })
+
+      const compositeKey = `${pack.packId}:${guidedItem.unitIds[0] ?? ''}`
+      const learningBefore = await testDb.learningProgress.get(compositeKey)
+      expect(learningBefore?.independentSuccessesCount).toBe(1)
+
+      // Intentar reenviar stg-5 con un NUEVO attemptId cuando stg-5 ya está completada
+      const repeatRes = await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-stg5-NEW-ID-REPEAT',
+        sessionId: 'sess-guided-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-5', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-5' },
+        durationMs: 2000,
+      })
+
+      expect(repeatRes.evaluationResult.feedbackCode).toBe('GUIDED_STAGE_ALREADY_COMPLETED')
+
+      // El contador de éxitos independientes se mantiene strictly en 1
+      const learningAfter = await testDb.learningProgress.get(compositeKey)
+      expect(learningAfter?.independentSuccessesCount).toBe(1)
+    })
+
+    it('E. Rutas Terminales de Etapa 5 (correct, needs_review, skipped): las 3 completan la etapa y avanzan la sesión', async () => {
+      // Probar ruta needs_review en etapa 5
+      await testDb.sessions.put({
+        sessionId: 'sess-guided-needs-review',
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        mode: 'guided',
+        presetName: '5_minutes',
+        startedAt: new Date().toISOString(),
+        deadlineAt: null,
+        planItems: [{ itemId: guidedItem.itemId, unitId: guidedItem.unitIds[0] ?? 'unit-log', reasonCode: 'new_needs_guidance', reasonDescription: 'Test' }],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+
+      // Completar etapas 1 a 4
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-needs-review', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-needs-review', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-needs-review', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-nr-stg4',
+        sessionId: 'sess-guided-needs-review',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      // Enviar respuesta no reconocida en stg-5 (needs_review)
+      const resNeedsReview = await submitAttempt({
+        db: testDb,
+        attemptId: 'att-stg5-needs-review',
+        sessionId: 'sess-guided-needs-review',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-5', responseRaw: 'comando_desconocido' },
+        evaluationOptions: { guidedStageId: 'stg-5' },
+        durationMs: 2000,
+      })
+
+      expect(resNeedsReview.evaluationResult.status).toBe('needs_review')
+      expect(resNeedsReview.isSessionCompleted).toBe(true)
+
+      const sessNR = await testDb.sessions.get('sess-guided-needs-review')
+      expect(sessNR?.currentIndex).toBe(1)
+      expect(sessNR?.status).toBe('completed')
+
+      const compositeKey = `${pack.packId}:${guidedItem.unitIds[0] ?? ''}`
+      const learningNR = await testDb.learningProgress.get(compositeKey)
+      // Confirmar que NO otorgó éxito independiente
+      expect(learningNR?.independentSuccessesCount ?? 0).toBe(0)
+      expect(learningNR?.state).not.toBe('ready_for_assessment')
+      expect(learningNR?.state).not.toBe('mastered')
+
+      // Limpiar guidedProgress para probar la ruta skipped en una nueva sesión limpia
+      await testDb.guidedProgress.clear()
+
+      // Probar ruta skipped en etapa 5
+      await testDb.sessions.put({
+        sessionId: 'sess-guided-skipped',
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        mode: 'guided',
+        presetName: '5_minutes',
+        startedAt: new Date().toISOString(),
+        deadlineAt: null,
+        planItems: [{ itemId: guidedItem.itemId, unitId: guidedItem.unitIds[0] ?? 'unit-log', reasonCode: 'new_needs_guidance', reasonDescription: 'Test' }],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-skipped', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-skipped', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-skipped', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-skipped-stg4',
+        sessionId: 'sess-guided-skipped',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      const resSkip = await submitAttempt({
+        db: testDb,
+        attemptId: 'att-stg5-skipped',
+        sessionId: 'sess-guided-skipped',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { isSkipped: true, stageId: 'stg-5' },
+        evaluationOptions: { guidedStageId: 'stg-5', isSkipped: true },
+        durationMs: 1000,
+      })
+
+      expect(resSkip.attempt.workflowStatus).toBe('skipped')
+      expect(resSkip.isSessionCompleted).toBe(true)
+
+      const sessSkip = await testDb.sessions.get('sess-guided-skipped')
+      expect(sessSkip?.currentIndex).toBe(1)
+      expect(sessSkip?.status).toBe('completed')
+    })
+
+    it('F. Evitar vista completada transitoria e invalidez de F5: completar etapa 5 avanza la sesión atómicamente', async () => {
+      await testDb.guidedProgress.clear()
+
+      // Crear sesión con 2 ítems
+      const secondItem = officialPack.items.find((i) => i.itemId !== guidedItem.itemId) as ContentItem
+
+      await testDb.sessions.put({
+        sessionId: 'sess-guided-multi',
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        mode: 'guided',
+        presetName: '5_minutes',
+        startedAt: new Date().toISOString(),
+        deadlineAt: null,
+        planItems: [
+          { itemId: guidedItem.itemId, unitId: guidedItem.unitIds[0] ?? 'unit-log', reasonCode: 'new_needs_guidance', reasonDescription: 'Test 1' },
+          { itemId: secondItem.itemId, unitId: secondItem.unitIds[0] ?? 'unit-2', reasonCode: 'new_needs_guidance', reasonDescription: 'Test 2' },
+        ],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+
+      // Completar etapas 1 a 4
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-multi', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-1' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-multi', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-2' })
+      await advanceExpositoryGuidedStage({ db: testDb, sessionId: 'sess-guided-multi', item: guidedItem, packId: pack.packId, packVersion: pack.packVersion, stageId: 'stg-3' })
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-multi-stg4',
+        sessionId: 'sess-guided-multi',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-4', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-4' },
+        durationMs: 2000,
+      })
+
+      // Resolver etapa 5
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-guided-multi-stg5',
+        sessionId: 'sess-guided-multi',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: { stageId: 'stg-5', responseRaw: 'tail -n 20 /var/log/auth.log' },
+        evaluationOptions: { guidedStageId: 'stg-5' },
+        durationMs: 2000,
+      })
+
+      // Confirmar que la sesión avanzó a currentIndex = 1 (segundo ítem)
+      const sessionAfter = await testDb.sessions.get('sess-guided-multi')
+      expect(sessionAfter?.currentIndex).toBe(1)
+      expect(sessionAfter?.status).toBe('active')
+      expect(sessionAfter?.planItems[sessionAfter.currentIndex]?.itemId).toBe(secondItem.itemId)
     })
   })
 })

@@ -63,6 +63,7 @@ function TestSessionApp({ db, pack }: { db: TypeOpsDatabase; pack: ContentPack }
 
   return (
     <SessionRunnerView
+      db={db}
       state={state}
       onSubmitResponse={(responseRaw, durationMs) => {
         void submitResponse(responseRaw, durationMs)
@@ -104,7 +105,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
 
     // Debe abrir la sesión directamente presentando el primer ítem
     expect(await screen.findByRole('region', { name: /Sesión interactiva en curso/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Enviar respuesta/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Continuar/i })).toBeInTheDocument()
   })
 
   it('permite abrir configuración personalizada y seleccionar modo', async () => {
@@ -163,11 +164,18 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
 
     // Iniciar sesión recomendada (modo guided por defecto)
     await user.click(screen.getByRole('button', { name: 'Iniciar sesión recomendada' }))
-
     expect(await screen.findByRole('region', { name: /Sesión interactiva en curso/i })).toBeInTheDocument()
 
-    // Enviar respuesta vacía
-    const submitBtn = screen.getByRole('button', { name: /Enviar respuesta/i })
+    // Avanzar las 3 etapas expositivas (Continuar)
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 2/i })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 3/i })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 4/i })).toBeInTheDocument()
+
+    // Enviar respuesta vacía en la etapa 4 evaluable
+    const submitBtn = await screen.findByRole('button', { name: /Enviar respuesta/i })
     await user.click(submitBtn)
 
     // Debe mostrar la alerta de validación y NO avanzar a feedback
@@ -176,22 +184,28 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
     expect(alert).toHaveTextContent('Esta etapa requiere una respuesta para avanzar')
   })
 
-  it('muestra feedback neutral "Práctica registrada" ante cualquier respuesta no vacía en guided_practice (SA-02 & SA-03)', async () => {
+  it('muestra feedback al responder en la etapa 4 de guided_practice', async () => {
     const user = userEvent.setup()
     render(<TestSessionApp db={testDb} pack={pack} />)
 
     await user.click(screen.getByRole('button', { name: 'Iniciar sesión recomendada' }))
     expect(await screen.findByRole('region', { name: /Sesión interactiva en curso/i })).toBeInTheDocument()
 
-    const input = screen.getByLabelText('Respuesta:')
-    await user.type(input, 'texto arbitrario de prueba')
+    // Avanzar las 3 etapas expositivas (Continuar)
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 2/i })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 3/i })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { level: 3, name: /Etapa 4/i })).toBeInTheDocument()
+
+    const input = await screen.findByRole('textbox', { name: /Respuesta:/i })
+    await user.type(input, 'tail -n 20 /var/log/auth.log')
 
     const submitBtn = screen.getByRole('button', { name: /Enviar respuesta/i })
     await user.click(submitBtn)
 
-    expect(await screen.findByText(/Práctica registrada/i)).toBeInTheDocument()
-    expect(screen.queryByText('✔ Respuesta correcta')).toBeNull()
-    expect(screen.queryByText('✖ Respuesta incorrecta')).toBeNull()
+    expect(await screen.findByText(/Respuesta correcta para la etapa/i)).toBeInTheDocument()
   })
 
   it('permite omitir un ejercicio mostrando el banner de ejercicio omitido', async () => {
@@ -247,7 +261,8 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
       />,
     )
 
-    expect(screen.getByText(/No se encontró una etapa evaluable compatible en este ítem guiado/i)).toBeInTheDocument()
+    expect(screen.getByText(/Modelo solo/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Continuar/i })).toBeInTheDocument()
   })
 
   describe('Reglas de visibilidad y conservación de pistas (Hito 4)', () => {
@@ -600,8 +615,16 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
       await user.click(screen.getByRole('button', { name: 'Iniciar sesión recomendada' }))
       expect(await screen.findByRole('region', { name: /Sesión interactiva en curso/i })).toBeInTheDocument()
 
-      // Intentar enviar respuesta vacía -> no avanza a feedback
-      await user.click(screen.getByRole('button', { name: /Enviar respuesta/i }))
+      // Avanzar las 3 etapas expositivas (Continuar)
+      await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+      expect(await screen.findByRole('heading', { level: 3, name: /Etapa 2/i })).toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+      expect(await screen.findByRole('heading', { level: 3, name: /Etapa 3/i })).toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+      expect(await screen.findByRole('heading', { level: 3, name: /Etapa 4/i })).toBeInTheDocument()
+
+      // Intentar enviar respuesta vacía en la etapa 4 (guided_exercise) -> no avanza a feedback
+      await user.click(await screen.findByRole('button', { name: /Enviar respuesta/i }))
       expect(await screen.findByRole('alert')).toHaveTextContent('Esta etapa requiere una respuesta para avanzar')
 
       // Omitir ejercicio -> avanza por la ruta de omisión
