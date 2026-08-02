@@ -2,18 +2,79 @@ import type { CommandIntentionItem, CommandNormalizationOption } from '../conten
 import type { EvaluationResult, DimensionResults, EvaluationErrorCode } from './types'
 
 /**
+ * Escáner de estados determinista para colapsar espacios únicamente fuera de comillas simples o dobles.
+ * Preserva comillas, caracteres escapados y espacios internos intactos.
+ */
+export function normalizeCommandSpaces(text: string): string {
+  let result = ''
+  let inSingleQuote = false
+  let inDoubleQuote = false
+  let isEscaped = false
+  let lastWasSpace = false
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (char === undefined) continue
+
+    if (isEscaped) {
+      result += char
+      isEscaped = false
+      lastWasSpace = false
+      continue
+    }
+
+    if (char === '\\' && !inSingleQuote) {
+      isEscaped = true
+      result += char
+      lastWasSpace = false
+      continue
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote
+      result += char
+      lastWasSpace = false
+      continue
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote
+      result += char
+      lastWasSpace = false
+      continue
+    }
+
+    if (inSingleQuote || inDoubleQuote) {
+      result += char
+      lastWasSpace = false
+    } else {
+      if (/\s/.test(char)) {
+        if (!lastWasSpace) {
+          result += ' '
+          lastWasSpace = true
+        }
+      } else {
+        result += char
+        lastWasSpace = false
+      }
+    }
+  }
+
+  return result
+}
+
+/**
  * Aplica normalización conservadora según las opciones declaradas por el ítem.
  */
 export function normalizeCommand(text: string, options: CommandNormalizationOption[]): string {
   let result = text.replace(/\r\n/g, '\n')
 
-  if (options.includes('trim_outer')) {
-    result = result.trim()
+  if (options.includes('spaces_outside_quotes')) {
+    result = normalizeCommandSpaces(result)
   }
 
-  if (options.includes('spaces_outside_quotes')) {
-    // Normalizar espacios múltiples fuera de comillas simples o dobles
-    result = result.replace(/\s+/g, ' ')
+  if (options.includes('trim_outer')) {
+    result = result.trim()
   }
 
   return result

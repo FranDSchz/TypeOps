@@ -63,13 +63,24 @@ export function validateResponsePresent(
     }
 
     case 'exact_question': {
-      const optionId = typeof responseRaw === 'string' ? responseRaw : ''
-      if (!optionId.trim()) {
-        return {
-          isValid: false,
-          errorCode: 'missing_choice',
-          errorMessage: 'Debés seleccionar una opción antes de enviar.',
-          targetElementId: 'exact-options-group',
+      if (Array.isArray(responseRaw)) {
+        if (responseRaw.length === 0) {
+          return {
+            isValid: false,
+            errorCode: 'missing_choice',
+            errorMessage: 'Debés seleccionar una opción antes de enviar.',
+            targetElementId: 'exact-options-group',
+          }
+        }
+      } else {
+        const text = typeof responseRaw === 'string' ? responseRaw : ''
+        if (!text.trim()) {
+          return {
+            isValid: false,
+            errorCode: 'missing_choice',
+            errorMessage: 'Debés seleccionar una opción antes de enviar.',
+            targetElementId: 'exact-options-group',
+          }
         }
       }
       return { isValid: true }

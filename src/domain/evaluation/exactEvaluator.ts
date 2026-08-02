@@ -26,7 +26,16 @@ export function evaluateExactQuestion(
     isCorrect = item.acceptedAnswers.some(
       (ans) => normalizeExact(ans, item.caseSensitive) === normalized,
     )
+  } else if (item.answerType === 'ordered_steps') {
+    const responseArray = Array.isArray(responseRaw) ? responseRaw : [responseRaw]
+    const normalizedResponses = responseArray.map((r) => normalizeExact(r, item.caseSensitive))
+    const normalizedAccepted = item.acceptedAnswers.map((a) => normalizeExact(a, item.caseSensitive))
+
+    isCorrect =
+      normalizedResponses.length === normalizedAccepted.length &&
+      normalizedResponses.every((val, idx) => val === normalizedAccepted[idx])
   } else {
+    // multiple_choice (orden independiente)
     const responseArray = Array.isArray(responseRaw) ? responseRaw : [responseRaw]
     const normalizedResponses = responseArray.map((r) => normalizeExact(r, item.caseSensitive)).sort()
     const normalizedAccepted = item.acceptedAnswers.map((a) => normalizeExact(a, item.caseSensitive)).sort()

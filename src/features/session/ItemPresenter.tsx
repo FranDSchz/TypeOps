@@ -15,6 +15,13 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
   // Estado local de respuesta según el tipo de ítem
   const [textInput, setTextInput] = useState('')
   const [singleChoiceId, setSingleChoiceId] = useState('')
+  const [multipleChoiceIds, setMultipleChoiceIds] = useState<string[]>([])
+  const [orderedChoiceIds, setOrderedChoiceIds] = useState<string[]>(() => {
+    if (item.kind === 'exact_question' && item.answerType === 'ordered_steps' && item.options) {
+      return item.options.map((o) => o.optionId)
+    }
+    return []
+  })
   const [openText, setOpenText] = useState('')
   const [selectedDecisionChoiceId, setSelectedDecisionChoiceId] = useState('')
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([])
@@ -36,7 +43,16 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
       case 'command_intention':
         return textInput
       case 'exact_question':
-        return singleChoiceId
+        if (item.answerType === 'single_choice') {
+          return singleChoiceId
+        }
+        if (item.answerType === 'multiple_choice') {
+          return multipleChoiceIds
+        }
+        if (item.answerType === 'short_exact') {
+          return textInput
+        }
+        return orderedChoiceIds
       case 'open_question':
         return openText
       case 'decision':
@@ -175,31 +191,137 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
           </div>
         )}
 
-        {item.kind === 'exact_question' && item.options && (
-          <div
-            id="exact-options-group"
-            tabIndex={-1}
-            className="input-group"
-            role="radiogroup"
-            aria-label="Opciones de respuesta"
-          >
-            {item.options.map((opt, idx) => (
-              <label key={opt.optionId} className="radio-card">
+        {item.kind === 'exact_question' && (
+          <div id="exact-options-group" tabIndex={-1} className="input-group">
+            {item.answerType === 'single_choice' && item.options && (
+              <div role="radiogroup" aria-label="Opciones de respuesta" className="options-stack">
+                {item.options.map((opt, idx) => (
+                  <label key={opt.optionId} className="radio-card">
+                    <input
+                      id={`exact-option-${String(idx)}`}
+                      type="radio"
+                      name="exactOption"
+                      value={opt.optionId}
+                      checked={singleChoiceId === opt.optionId}
+                      onChange={() => {
+                        setValidationError(null)
+                        setSingleChoiceId(opt.optionId)
+                      }}
+                      disabled={disabled}
+                    />
+                    <span className="radio-text">{opt.text}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {item.answerType === 'multiple_choice' && item.options && (
+              <div role="group" aria-label="Selección múltiple de opciones" className="options-stack">
+                {item.options.map((opt, idx) => (
+                  <label key={opt.optionId} className="checkbox-card">
+                    <input
+                      id={`exact-option-${String(idx)}`}
+                      type="checkbox"
+                      value={opt.optionId}
+                      checked={multipleChoiceIds.includes(opt.optionId)}
+                      onChange={() => {
+                        setValidationError(null)
+                        if (multipleChoiceIds.includes(opt.optionId)) {
+                          setMultipleChoiceIds(multipleChoiceIds.filter((id) => id !== opt.optionId))
+                        } else {
+                          setMultipleChoiceIds([...multipleChoiceIds, opt.optionId])
+                        }
+                      }}
+                      disabled={disabled}
+                    />
+                    <span className="checkbox-text">{opt.text}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {item.answerType === 'short_exact' && (
+              <div className="input-group">
+                <label htmlFor="exact-short-input" className="input-label">
+                  Respuesta exacta:
+                </label>
                 <input
-                  id={`exact-option-${String(idx)}`}
-                  type="radio"
-                  name="exactOption"
-                  value={opt.optionId}
-                  checked={singleChoiceId === opt.optionId}
-                  onChange={() => {
+                  id="exact-short-input"
+                  type="text"
+                  className="form-control text-mono"
+                  value={textInput}
+                  onChange={(e) => {
                     setValidationError(null)
-                    setSingleChoiceId(opt.optionId)
+                    setTextInput(e.target.value)
                   }}
                   disabled={disabled}
+                  placeholder="Escribí la respuesta exacta..."
+                  autoFocus
+                  autoComplete="off"
                 />
-                <span className="radio-text">{opt.text}</span>
-              </label>
-            ))}
+              </div>
+            )}
+
+            {item.answerType === 'ordered_steps' && item.options && (
+              <div className="ordered-steps-group" aria-label="Ordenamiento de pasos">
+                <p className="section-label">Ordená las etapas con los botones Subir / Bajar:</p>
+                <ol className="ordered-steps-list">
+                  {orderedChoiceIds.map((optId, idx) => {
+                    const optObj = item.options?.find((o) => o.optionId === optId)
+                    return (
+                      <li key={optId} className="ordered-step-item">
+                        <span className="step-number">{idx + 1}.</span>
+                        <span className="step-text">{optObj?.text ?? optId}</span>
+                        <div className="step-actions">
+                          <button
+                            type="button"
+                            className="btn btn--small"
+                            onClick={() => {
+                              setValidationError(null)
+                              if (idx > 0) {
+                                const next = [...orderedChoiceIds]
+                                const curr = next[idx]
+                                const prev = next[idx - 1]
+                                if (curr !== undefined && prev !== undefined) {
+                                  next[idx] = prev
+                                  next[idx - 1] = curr
+                                  setOrderedChoiceIds(next)
+                                }
+                              }
+                            }}
+                            disabled={disabled || idx === 0}
+                            aria-label={`Subir paso ${String(idx + 1)}`}
+                          >
+                            ▲ Subir
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--small"
+                            onClick={() => {
+                              setValidationError(null)
+                              if (idx < orderedChoiceIds.length - 1) {
+                                const next = [...orderedChoiceIds]
+                                const curr = next[idx]
+                                const nextEl = next[idx + 1]
+                                if (curr !== undefined && nextEl !== undefined) {
+                                  next[idx] = nextEl
+                                  next[idx + 1] = curr
+                                  setOrderedChoiceIds(next)
+                                }
+                              }
+                            }}
+                            disabled={disabled || idx === orderedChoiceIds.length - 1}
+                            aria-label={`Bajar paso ${String(idx + 1)}`}
+                          >
+                            ▼ Bajar
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
+            )}
           </div>
         )}
 
@@ -214,7 +336,8 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
             <textarea
               id="open-textarea"
               className="form-control textarea-input"
-              rows={4}
+              rows={item.maxResponse.lines ?? 4}
+              maxLength={item.maxResponse.characters}
               value={openText}
               onChange={(e) => {
                 setValidationError(null)
@@ -224,6 +347,11 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
               placeholder="Explicá tu análisis en 2 o 3 frases..."
               autoFocus
             />
+            {item.maxResponse.characters !== undefined && (
+              <div className="char-counter" aria-live="polite">
+                {String(openText.length)} / {String(item.maxResponse.characters)} caracteres
+              </div>
+            )}
           </div>
         )}
 
@@ -258,7 +386,7 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
             >
               <p className="section-label">Seleccioná tu decisión:</p>
               {item.choices.map((ch, idx) => (
-                <label key={ch.choiceId} className="radio-card">
+                <label key={ch.choiceId} htmlFor={`decision-choice-${String(idx)}`} className="radio-card">
                   <input
                     id={`decision-choice-${String(idx)}`}
                     type="radio"
