@@ -57,7 +57,7 @@ export interface SessionRecord {
   updatedAt: string
 }
 
-export type WorkflowStatus = 'evaluated' | 'pending_review'
+export type WorkflowStatus = 'evaluated' | 'pending_review' | 'skipped' | 'guided_step_recorded' | 'failed'
 
 export interface AttemptRecord {
   attemptId: string

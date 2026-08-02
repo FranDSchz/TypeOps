@@ -11,18 +11,19 @@ export function ItemFeedbackView({ item, evaluationResult, onContinue }: ItemFee
   const isCorrect = evaluationResult.status === 'correct'
   const isNeedsReview = evaluationResult.status === 'needs_review'
   const isIncorrect = evaluationResult.status === 'incorrect'
+  const isNotAssessed = evaluationResult.status === 'not_assessed'
   const isGuided = item.kind === 'guided_practice'
 
   return (
     <div className="item-feedback-view" role="region" aria-label="Resultado de la respuesta">
       <div className={`feedback-banner feedback-banner--${evaluationResult.status}`}>
         <h3 className="feedback-banner-title">
-          {isGuided && isCorrect && '📝 Etapa completada / Intento registrado'}
-          {isGuided && isIncorrect && '✖ Respuesta requerida para la etapa'}
-          {!isGuided && isCorrect && '✔ Respuesta correcta'}
-          {!isGuided && isNeedsReview && '💬 Respuesta pendiente de revisión / no reconocida'}
-          {!isGuided && isIncorrect && '✖ Respuesta incorrecta'}
-          {!isCorrect && !isNeedsReview && !isIncorrect && `Estado: ${evaluationResult.status}`}
+          {isNotAssessed && '⏭ Ejercicio omitido'}
+          {!isNotAssessed && isGuided && isCorrect && '📝 Etapa completada / Intento registrado'}
+          {!isNotAssessed && isGuided && isIncorrect && '✖ Respuesta incorrecta para la etapa'}
+          {!isNotAssessed && !isGuided && isCorrect && '✔ Respuesta correcta'}
+          {!isNotAssessed && !isGuided && isNeedsReview && '💬 Respuesta pendiente de revisión / no reconocida'}
+          {!isNotAssessed && !isGuided && isIncorrect && '✖ Respuesta incorrecta'}
         </h3>
         {evaluationResult.feedbackMessage && (
           <p className="feedback-banner-desc">{evaluationResult.feedbackMessage}</p>

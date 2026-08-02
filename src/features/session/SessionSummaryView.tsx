@@ -18,8 +18,12 @@ export function SessionSummaryView({
   onRetryClose,
   closeError,
 }: SessionSummaryViewProps) {
-  const correctCount = submittedAttempts.filter((a) => a.evaluationResult.status === 'correct').length
   const totalCount = submittedAttempts.length
+  const correctCount = submittedAttempts.filter((a) => a.evaluationResult.status === 'correct').length
+  const skippedCount = submittedAttempts.filter((a) => a.workflowStatus === 'skipped').length
+  const pendingCount = submittedAttempts.filter((a) => a.workflowStatus === 'pending_review').length
+  const answeredCount = submittedAttempts.filter((a) => a.workflowStatus !== 'skipped').length
+  const totalHintsUsed = submittedAttempts.reduce((acc, a) => acc + a.hintsUsedCount, 0)
 
   return (
     <div className="session-summary-view" role="region" aria-label="Resumen de cierre de sesión">
@@ -46,12 +50,28 @@ export function SessionSummaryView({
           <span className="stat-value">{sessionRecord?.mode ?? 'custom'}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Ejercicios enviados</span>
+          <span className="stat-label">Intentos registrados</span>
           <span className="stat-value">{totalCount}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Respondidos</span>
+          <span className="stat-value">{answeredCount}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Pendientes de revisión</span>
+          <span className="stat-value">{pendingCount}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Omitidos</span>
+          <span className="stat-value">{skippedCount}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Correctos</span>
           <span className="stat-value">{correctCount}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Pistas utilizadas</span>
+          <span className="stat-value">{totalHintsUsed}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Motivo de cierre</span>

@@ -1,9 +1,9 @@
 import type { TypeOpsDatabase } from '../db/database'
-import type { AttemptRecord, LearningProgressRecord, SessionCompletionReason, WorkflowStatus } from '../db/records'
 import type { ContentItem } from '../../domain/content/types'
+import type { EvaluationResult, EvaluationOptions } from '../../domain/evaluation/types'
+import type { AttemptRecord, SessionCompletionReason, WorkflowStatus, LearningProgressRecord } from '../db/records'
 import { evaluateContentItem } from '../../domain/evaluation'
-import type { EvaluationOptions, EvaluationResult } from '../../domain/evaluation/types'
-import { computeNextLearningState, type LearningProgress, type ComputeLearningStateOptions } from '../../domain/learning/learningState'
+import { computeNextLearningState, type ComputeLearningStateOptions, type LearningProgress } from '../../domain/learning/learningState'
 
 export interface SubmitAttemptOptions {
   db: TypeOpsDatabase
@@ -23,10 +23,6 @@ export interface SubmitAttemptResult {
   isSessionCompleted: boolean
 }
 
-/**
- * Procesa la evaluación y persiste el intento, progreso de aprendizaje
- * y avance de la sesión de forma estrictamente atómica e idempotente.
- */
 export async function submitAttempt(options: SubmitAttemptOptions): Promise<SubmitAttemptResult> {
   const { db, attemptId, sessionId, item, packId, packVersion, responseRaw, evaluationOptions, durationMs } = options
 
@@ -43,16 +39,99 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
       }
     }
 
-    // 2. Evaluación determinista del item
-    const evaluationResult = evaluateContentItem(item, responseRaw, evaluationOptions)
+    // 2. Comprobar si es un intento de omisión (Omitir)
+    const isSkipped =
+      typeof responseRaw === 'object' && responseRaw !== null && Boolean((responseRaw as { isSkipped?: boolean }).isSkipped)
 
-    // Para typing_copy sin captura mecánica completa, asegurar dimensión not_assessed
-    if (item.kind === 'typing_copy') {
-      evaluationResult.dimensionResults.mechanical = 'not_assessed'
+    let evaluationResult: EvaluationResult
+    let workflowStatus: WorkflowStatus
+
+    if (isSkipped) {
+      workflowStatus = 'skipped'
+      evaluationResult = {
+        status: 'not_assessed',
+        dimensionResults: {
+          concept: 'not_assessed',
+          toolSelection: 'not_assessed',
+          semanticStructure: 'not_assessed',
+          syntax: 'not_assessed',
+          interpretation: 'not_assessed',
+          verification: 'not_assessed',
+          mechanical: 'not_assessed',
+        },
+        errorCodes: [],
+        feedbackCode: 'ITEM_SKIPPED',
+        feedbackMessage: 'El ejercicio fue omitido por el usuario.',
+        requiresReview: false,
+      }
+    } else {
+      evaluationResult = evaluateContentItem(item, responseRaw, evaluationOptions)
+
+      if (item.kind === 'typing_copy') {
+        evaluationResult.dimensionResults.mechanical = 'not_assessed'
+      }
+
+      if (item.kind === 'open_question') {
+        workflowStatus = 'pending_review'
+      } else if (item.kind === 'guided_practice') {
+        const evaluableStage = item.stages.find(
+          (s) => s.stageType === 'guided_exercise' || s.stageType === 'unassisted_exercise',
+        )
+        let actualText = ''
+        if (typeof responseRaw === 'object' && responseRaw !== null) {
+          actualText = ((responseRaw as { responseRaw?: string }).responseRaw ?? '').trim()
+        } else if (typeof responseRaw === 'string') {
+          actualText = responseRaw.trim()
+        }
+
+        let expectedCommand: string | undefined = undefined
+        if (evaluableStage?.content.startsWith('Escribí ')) {
+          expectedCommand = evaluableStage.content.replace(/^Escribí\s+/, '').trim()
+        }
+
+        if (!actualText) {
+          evaluationResult = {
+            status: 'incorrect',
+            dimensionResults: {
+              concept: 'incorrect',
+              toolSelection: 'not_assessed',
+              semanticStructure: 'not_assessed',
+              syntax: 'incorrect',
+              interpretation: 'not_assessed',
+              verification: 'not_assessed',
+              mechanical: 'not_assessed',
+            },
+            errorCodes: ['missing_required_component'],
+            feedbackCode: 'GUIDED_STAGE_RESPONSE_EMPTY',
+            feedbackMessage: 'La etapa requiere una respuesta para avanzar.',
+            requiresReview: false,
+          }
+          workflowStatus = 'failed'
+        } else if (expectedCommand && actualText.toLowerCase() !== expectedCommand.toLowerCase()) {
+          evaluationResult = {
+            status: 'incorrect',
+            dimensionResults: {
+              concept: 'incorrect',
+              toolSelection: 'not_assessed',
+              semanticStructure: 'not_assessed',
+              syntax: 'incorrect',
+              interpretation: 'not_assessed',
+              verification: 'not_assessed',
+              mechanical: 'not_assessed',
+            },
+            errorCodes: ['syntax_mismatch'],
+            feedbackCode: 'GUIDED_STAGE_EXERCISE_FAILED',
+            feedbackMessage: `El comando ingresado no coincide con el ejercicio guiado ('${expectedCommand}').`,
+            requiresReview: false,
+          }
+          workflowStatus = 'failed'
+        } else {
+          workflowStatus = evaluationResult.status === 'incorrect' ? 'failed' : 'guided_step_recorded'
+        }
+      } else {
+        workflowStatus = 'evaluated'
+      }
     }
-
-    // Para open_question, workflowStatus = 'pending_review' manteniendo status: 'needs_review'
-    const workflowStatus: WorkflowStatus = item.kind === 'open_question' ? 'pending_review' : 'evaluated'
 
     const unitId = item.unitIds[0] ?? item.itemId
     const nowIso = new Date().toISOString()
@@ -79,40 +158,39 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
     const compositeUnitKey = `${packId}:${unitId}`
     const currentProgressRecord = await db.learningProgress.get(compositeUnitKey)
 
-    if (item.kind === 'guided_practice') {
-      // Política de avance para guided_practice en Hito 4:
-      // - Si la unidad no fue iniciada (sin registro o state: 'new'), transiciona a state: 'learning'
-      //   (transición guiada legítima para que la recomendación posterior pase a 'resume_guided').
-      // - NO incrementa independentSuccessesCount (permanece en 0 o valor previo).
-      // - NO produce 'ready_for_assessment' ni programa 'nextReviewAt'.
-      const existingPracticed = currentProgressRecord?.practicedItemIds ?? []
-      const updatedPracticedItemIds = Array.from(new Set([...existingPracticed, item.itemId]))
-      const nextState = !currentProgressRecord || currentProgressRecord.state === 'new'
-        ? 'learning'
-        : currentProgressRecord.state
+    if (isSkipped) {
+      // Omitir no modifica el progreso de aprendizaje
+    } else if (item.kind === 'guided_practice') {
+      // Si la respuesta fue vacía/incorrecta, no actualiza el progreso
+      if (evaluationResult.status !== 'incorrect') {
+        const existingPracticed = currentProgressRecord?.practicedItemIds ?? []
+        const updatedPracticedItemIds = Array.from(new Set([...existingPracticed, item.itemId]))
+        const nextState = !currentProgressRecord || currentProgressRecord.state === 'new'
+          ? 'learning'
+          : currentProgressRecord.state
 
-      const updatedProgressRecord: LearningProgressRecord = {
-        compositeUnitKey,
-        packId,
-        unitId,
-        state: nextState,
-        independentSuccessesCount: currentProgressRecord?.independentSuccessesCount ?? 0,
-        practicedItemIds: updatedPracticedItemIds,
-        lastPracticedAt: nowIso,
-        lastReasonCode: !currentProgressRecord || currentProgressRecord.state === 'new'
-          ? 'INITIAL_LEARNING_OPENED'
-          : (currentProgressRecord.lastReasonCode ?? 'GUIDED_STAGE_COMPLETED'),
-        updatedAt: nowIso,
+        const updatedProgressRecord: LearningProgressRecord = {
+          compositeUnitKey,
+          packId,
+          unitId,
+          state: nextState,
+          independentSuccessesCount: currentProgressRecord?.independentSuccessesCount ?? 0,
+          practicedItemIds: updatedPracticedItemIds,
+          lastPracticedAt: nowIso,
+          lastReasonCode: !currentProgressRecord || currentProgressRecord.state === 'new'
+            ? 'INITIAL_LEARNING_OPENED'
+            : (currentProgressRecord.lastReasonCode ?? 'GUIDED_STAGE_COMPLETED'),
+          updatedAt: nowIso,
+        }
+
+        if (currentProgressRecord?.nextReviewAt !== undefined) {
+          updatedProgressRecord.nextReviewAt = currentProgressRecord.nextReviewAt
+        }
+
+        await db.learningProgress.put(updatedProgressRecord)
       }
-
-      if (currentProgressRecord?.nextReviewAt !== undefined) {
-        updatedProgressRecord.nextReviewAt = currentProgressRecord.nextReviewAt
-      }
-
-      await db.learningProgress.put(updatedProgressRecord)
     } else {
-      // Para ítems independientes (command_intention, typing_copy, exact_question, decision),
-      // se utiliza la máquina de estados completa computeNextLearningState()
+      // Para otros tipos (command_intention, typing_copy, exact_question, decision)
       let currentDomainProgress: LearningProgress | undefined = undefined
       if (currentProgressRecord) {
         currentDomainProgress = {
@@ -168,11 +246,14 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
       await db.learningProgress.put(updatedProgressRecord)
     }
 
-    // 5. Actualizar avance de la sesión
+    // 5. Actualizar avance de la sesión (currentIndex)
     const sessionRecord = await db.sessions.get(sessionId)
     let isSessionCompleted = false
 
-    if (sessionRecord) {
+    // Si es una respuesta vacía/fallida en guided_practice (no es omitir ni respuesta no vacía), NO avanzar la sesión
+    const shouldAdvanceIndex = !(!isSkipped && item.kind === 'guided_practice' && evaluationResult.status === 'incorrect')
+
+    if (sessionRecord && shouldAdvanceIndex) {
       const nextIndex = sessionRecord.currentIndex + 1
       const allItemsCompleted = nextIndex >= sessionRecord.planItems.length
       const isTimeExpired = sessionRecord.deadlineAt ? new Date().getTime() >= new Date(sessionRecord.deadlineAt).getTime() : false
@@ -199,29 +280,22 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
   })
 }
 
-/**
- * Cierra la sesión de forma atómica y elimina activeSessionId de settings
- * solo si la transacción de cierre se confirma con éxito.
- */
 export async function closeSession(
   db: TypeOpsDatabase,
   sessionId: string,
-  completionReason: SessionCompletionReason,
+  reason: SessionCompletionReason,
 ): Promise<void> {
   await db.transaction('rw', [db.sessions, db.settings], async () => {
-    const session = await db.sessions.get(sessionId)
-    if (!session) return
+    const sessionRecord = await db.sessions.get(sessionId)
+    if (sessionRecord) {
+      sessionRecord.status = 'completed'
+      sessionRecord.completionReason = reason
+      sessionRecord.updatedAt = new Date().toISOString()
+      await db.sessions.put(sessionRecord)
+    }
 
-    const nowIso = new Date().toISOString()
-    session.status = 'completed'
-    session.completionReason = completionReason
-    session.updatedAt = nowIso
-
-    await db.sessions.put(session)
-
-    // Eliminar activeSessionId de la tabla settings solo al confirmar la transacción
-    const settingRecord = await db.settings.get('activeSessionId')
-    if (settingRecord && settingRecord.value === sessionId) {
+    const activeSetting = await db.settings.get('activeSessionId')
+    if (activeSetting && activeSetting.value === sessionId) {
       await db.settings.delete('activeSessionId')
     }
   })

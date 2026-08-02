@@ -78,7 +78,8 @@ export function SessionRunnerView({
 
       if (e.altKey && e.key.toLowerCase() === 'h') {
         e.preventDefault()
-        if (currentItem && state.activeHintLevel < currentItem.hints.length) {
+        const canHaveHints = currentItem && currentItem.kind !== 'typing_copy' && currentItem.hints.length > 0
+        if (canHaveHints && state.activeHintLevel < currentItem.hints.length) {
           onUseHint()
         }
       }
@@ -96,7 +97,7 @@ export function SessionRunnerView({
   }
 
   function handleSkipItem() {
-    handleFormSubmit('')
+    handleFormSubmit({ isSkipped: true })
   }
 
   if (state.status === 'empty_plan') {
@@ -182,37 +183,49 @@ export function SessionRunnerView({
 
       {/* Contenido principal: presentación o feedback */}
       <main className="runner-main">
-        {state.status === 'active' && currentItem && (
-          <>
-            <ItemPresenter
-              item={currentItem}
-              activeHintLevel={state.activeHintLevel}
-              onSubmitResponse={handleFormSubmit}
-            />
+        {state.status === 'active' && currentItem && (() => {
+          const canHaveHints = currentItem.kind !== 'typing_copy' && currentItem.hints.length > 0
+          const remainingHints = currentItem.hints.length - state.activeHintLevel
+          const hasRemainingHints = remainingHints > 0
 
-            {/* Fila de controles de acción secundarios (HTML botones reales - AC-25) */}
-            <div className="runner-controls-bar">
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={onUseHint}
-                disabled={state.activeHintLevel >= currentItem.hints.length}
-                aria-label="Pedir pista (Alt+H)"
-              >
-                Pedir pista ({currentItem.hints.length - state.activeHintLevel} restantes)
-              </button>
+          return (
+            <>
+              <ItemPresenter
+                item={currentItem}
+                activeHintLevel={state.activeHintLevel}
+                onSubmitResponse={handleFormSubmit}
+              />
 
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={handleSkipItem}
-                aria-label="Omitir ejercicio"
-              >
-                Omitir ejercicio
-              </button>
-            </div>
-          </>
-        )}
+              {/* Fila de controles de acción secundarios (HTML botones reales - AC-25) */}
+              <div className="runner-controls-bar">
+                {canHaveHints && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={onUseHint}
+                    disabled={!hasRemainingHints}
+                    aria-label={
+                      hasRemainingHints
+                        ? 'Pedir pista (Alt+H)'
+                        : 'No quedan más pistas disponibles para este ejercicio'
+                    }
+                  >
+                    {hasRemainingHints ? `Pedir pista (${String(remainingHints)} restantes)` : 'Sin más pistas disponibles'}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={handleSkipItem}
+                  aria-label="Omitir ejercicio"
+                >
+                  Omitir ejercicio
+                </button>
+              </div>
+            </>
+          )
+        })()}
 
         {state.status === 'item_feedback' && currentItem && state.lastSubmittedAttempt && (
           <ItemFeedbackView
