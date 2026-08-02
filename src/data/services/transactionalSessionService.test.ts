@@ -6,7 +6,7 @@ import type { ContentPack, ContentItem } from '../../domain/content/types'
 import type { SessionRecord, LearningProgressRecord } from '../db/records'
 import { recommendNextItem } from '../../domain/recommendation/recommendationEngine'
 
-describe('TransactionalSessionService (Política Completa Hito 4)', () => {
+describe('TransactionalSessionService (Saneamiento V1)', () => {
   let testDb: TypeOpsDatabase
   const pack = officialPack as ContentPack
 
@@ -37,7 +37,7 @@ describe('TransactionalSessionService (Política Completa Hito 4)', () => {
     testDb.close()
   })
 
-  it('1. Texto arbitrario incorrecto en guided ("foo"): se evalúa como incorrecto (failed), no avanza currentIndex y no modifica progreso', async () => {
+  it('1. Texto arbitrario en guided ("foo"): se registra como guided_step_recorded con not_assessed, avanza índice y transiciona a learning con 0 éxitos (SA-02 & SA-03)', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
     const attemptId = 'att-guided-foo'
 
@@ -48,26 +48,28 @@ describe('TransactionalSessionService (Política Completa Hito 4)', () => {
       item: guidedItem,
       packId: pack.packId,
       packVersion: pack.packVersion,
-      responseRaw: 'foo',
+      responseRaw: { stageId: 'stg-4', responseRaw: 'foo' },
       durationMs: 4000,
     })
 
     expect(result.attempt.attemptId).toBe(attemptId)
-    expect(result.attempt.workflowStatus).toBe('failed')
-    expect(result.evaluationResult.status).toBe('incorrect')
-    expect(result.evaluationResult.feedbackMessage).toContain("El comando ingresado no coincide con el ejercicio guiado")
+    expect(result.attempt.workflowStatus).toBe('guided_step_recorded')
+    expect(result.evaluationResult.status).toBe('not_assessed')
+    expect(result.evaluationResult.feedbackCode).toBe('GUIDED_STAGE_RECORDED')
+    expect(result.evaluationResult.dimensionResults.concept).toBe('not_assessed')
 
-    // NO avanza el currentIndex (permanece en 0)
+    // Avanza el currentIndex de la sesión a 1
     const session = await testDb.sessions.get('sess-test-1')
-    expect(session?.currentIndex).toBe(0)
+    expect(session?.currentIndex).toBe(1)
 
-    // NO modifica progreso
+    // Transiciona a learning con 0 éxitos independientes
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
-    expect(progress).toBeUndefined()
+    expect(progress?.state).toBe('learning')
+    expect(progress?.independentSuccessesCount).toBe(0)
   })
 
-  it('2. Respuesta esperada en guided ("tail -n 20 /var/log/auth.log"): se registra como guided_step_recorded, avanza currentIndex pero independentSuccessesCount es 0', async () => {
+  it('2. Respuesta esperada en guided ("tail -n 20 /var/log/auth.log"): comportamiento neutral guided_step_recorded con 0 éxitos independientes', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
     const attemptId = 'att-guided-expected'
 
@@ -83,20 +85,18 @@ describe('TransactionalSessionService (Política Completa Hito 4)', () => {
     })
 
     expect(result.attempt.workflowStatus).toBe('guided_step_recorded')
-    expect(result.evaluationResult.status).toBe('correct')
+    expect(result.evaluationResult.status).toBe('not_assessed')
 
-    // Avanza currentIndex a 1
     const session = await testDb.sessions.get('sess-test-1')
     expect(session?.currentIndex).toBe(1)
 
-    // Transiciona de new -> learning pero independentSuccessesCount = 0
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
     expect(progress?.state).toBe('learning')
     expect(progress?.independentSuccessesCount).toBe(0)
   })
 
-  it('3. Omitir: se guarda como workflowStatus "skipped", evaluationResult "not_assessed", avanza currentIndex una sola vez y no modifica progreso', async () => {
+  it('3. Omitir: se guarda como workflowStatus "skipped", evaluationResult "not_assessed", avanza currentIndex una vez y no modifica progreso', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
     const attemptId = 'att-skip-1'
 
@@ -115,45 +115,140 @@ describe('TransactionalSessionService (Política Completa Hito 4)', () => {
     expect(result.evaluationResult.status).toBe('not_assessed')
     expect(result.evaluationResult.feedbackCode).toBe('ITEM_SKIPPED')
 
-    // Avance de la sesión: currentIndex pasa de 0 a 1
     const updatedSession = await testDb.sessions.get('sess-test-1')
     expect(updatedSession?.currentIndex).toBe(1)
 
-    // Sin cambios en éxitos independientes de LearningProgress por omitir
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
     expect(progress).toBeUndefined()
   })
 
-  it('4. Respuesta vacía en guided: se guarda como workflowStatus "failed", no avanza currentIndex y no actualiza progreso', async () => {
+  it('4. Invocación directa con respuesta vacía: arroja error previo a la transacción y no realiza escrituras parciales', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
-    const attemptId = 'att-empty-1'
+    const attemptId = 'att-empty-direct'
+
+    await expect(
+      submitAttempt({
+        db: testDb,
+        attemptId,
+        sessionId: 'sess-test-1',
+        item: guidedItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: '',
+        durationMs: 2000,
+      }),
+    ).rejects.toThrow('INVALID_RESPONSE_PRESENT')
+
+    // Ninguna escritura en intentos
+    const attempt = await testDb.attempts.get(attemptId)
+    expect(attempt).toBeUndefined()
+
+    // El currentIndex de la sesión NO avanza
+    const session = await testDb.sessions.get('sess-test-1')
+    expect(session?.currentIndex).toBe(0)
+
+    // El progreso no se modifica
+    const progress = await testDb.learningProgress.get(`${pack.packId}:unit-log-inspection`)
+    expect(progress).toBeUndefined()
+  })
+
+  it('5. SA-01 Integración: primer intento incorrecto en command_intention transiciona a learning con 0 éxitos independientes', async () => {
+    const cmdItem = pack.items.find((i) => i.itemId === 'cmd-tail-n') as ContentItem
+    const attemptId = 'att-cmd-incorrect'
 
     const result = await submitAttempt({
       db: testDb,
       attemptId,
       sessionId: 'sess-test-1',
-      item: guidedItem,
+      item: cmdItem,
       packId: pack.packId,
       packVersion: pack.packVersion,
-      responseRaw: '',
-      durationMs: 2000,
+      responseRaw: 'grep -n 20 /var/log/auth.log', // error de herramienta
+      durationMs: 3000,
     })
 
-    expect(result.attempt.workflowStatus).toBe('failed')
     expect(result.evaluationResult.status).toBe('incorrect')
+    expect(result.attempt.workflowStatus).toBe('evaluated')
 
-    // NO avanza el currentIndex (se mantiene en 0)
-    const session = await testDb.sessions.get('sess-test-1')
-    expect(session?.currentIndex).toBe(0)
-
-    // NO modifica progreso
     const compositeUnitKey = `${pack.packId}:unit-log-inspection`
+    const progress = await testDb.learningProgress.get(compositeUnitKey)
+    expect(progress?.state).toBe('learning')
+    expect(progress?.independentSuccessesCount).toBe(0)
+  })
+
+  it('6. open_question sin progreso previo: persiste el intento con pending_review, avanza la sesión y NO crea registro en LearningProgress', async () => {
+    const openItem = pack.items.find((i) => i.kind === 'open_question') as ContentItem
+    const attemptId = 'att-open-no-prog'
+
+    const result = await submitAttempt({
+      db: testDb,
+      attemptId,
+      sessionId: 'sess-test-1',
+      item: openItem,
+      packId: pack.packId,
+      packVersion: pack.packVersion,
+      responseRaw: 'Análisis detallado de los eventos en auth.log.',
+      durationMs: 10000,
+    })
+
+    expect(result.evaluationResult.status).toBe('needs_review')
+    expect(result.evaluationResult.requiresReview).toBe(true)
+    expect(result.attempt.workflowStatus).toBe('pending_review')
+
+    // La sesión avanza 1 posición
+    const session = await testDb.sessions.get('sess-test-1')
+    expect(session?.currentIndex).toBe(1)
+
+    // No se crea registro de progreso en la base de datos
+    const unitId = openItem.unitIds[0] ?? openItem.itemId
+    const compositeUnitKey = `${pack.packId}:${unitId}`
     const progress = await testDb.learningProgress.get(compositeUnitKey)
     expect(progress).toBeUndefined()
   })
 
-  it('5. Paridad entre ruta rápida y Modo 4: la recomendación posterior usa "resume_guided"', async () => {
+  it('7. open_question con progreso previo: persiste el intento, avanza la sesión y deja el LearningProgress totalmente intacto', async () => {
+    const openItem = pack.items.find((i) => i.kind === 'open_question') as ContentItem
+    const unitId = openItem.unitIds[0] ?? openItem.itemId
+    const compositeUnitKey = `${pack.packId}:${unitId}`
+
+    const existingProgress: LearningProgressRecord = {
+      compositeUnitKey,
+      packId: pack.packId,
+      unitId,
+      state: 'practicing',
+      independentSuccessesCount: 1,
+      practicedItemIds: ['item-prior-1'],
+      lastPracticedAt: '2026-08-01T12:00:00.000Z',
+      lastReasonCode: 'INDEPENDENT_SUCCESS_PRACTICING',
+      updatedAt: '2026-08-01T12:00:00.000Z',
+    }
+    await testDb.learningProgress.put(existingProgress)
+
+    const attemptId = 'att-open-with-prog'
+    const result = await submitAttempt({
+      db: testDb,
+      attemptId,
+      sessionId: 'sess-test-1',
+      item: openItem,
+      packId: pack.packId,
+      packVersion: pack.packVersion,
+      responseRaw: 'Análisis de incidentes en el sistema.',
+      durationMs: 8000,
+    })
+
+    expect(result.attempt.workflowStatus).toBe('pending_review')
+
+    // Sesión avanza
+    const session = await testDb.sessions.get('sess-test-1')
+    expect(session?.currentIndex).toBe(1)
+
+    // Progreso se mantiene 100% idéntico e intacto (incluyendo updatedAt)
+    const afterProgress = await testDb.learningProgress.get(compositeUnitKey)
+    expect(afterProgress).toEqual(existingProgress)
+  })
+
+  it('8. Paridad entre ruta rápida y Modo 4: la recomendación posterior usa "resume_guided"', async () => {
     const guidedItem = pack.items.find((i) => i.itemId === 'guided-tail-intro') as ContentItem
 
     await submitAttempt({
@@ -208,25 +303,5 @@ describe('TransactionalSessionService (Política Completa Hito 4)', () => {
 
     const allAttempts = await testDb.attempts.toArray()
     expect(allAttempts).toHaveLength(1)
-  })
-
-  it('preserva status: "needs_review" y marca workflowStatus: "pending_review" para open_question', async () => {
-    const openItem = pack.items.find((i) => i.kind === 'open_question') as ContentItem
-    const attemptId = 'att-open-1'
-
-    const result = await submitAttempt({
-      db: testDb,
-      attemptId,
-      sessionId: 'sess-test-1',
-      item: openItem,
-      packId: pack.packId,
-      packVersion: pack.packVersion,
-      responseRaw: 'Verificar si hubo algún intento exitoso en los logs.',
-      durationMs: 12000,
-    })
-
-    expect(result.evaluationResult.status).toBe('needs_review')
-    expect(result.evaluationResult.requiresReview).toBe(true)
-    expect(result.attempt.workflowStatus).toBe('pending_review')
   })
 })

@@ -66,19 +66,19 @@ export function evaluateGuidedStage(
 
   if (!capabilities.requiresAttempt) {
     return {
-      status: 'correct',
+      status: 'not_assessed',
       dimensionResults: {
-        concept: 'correct',
+        concept: 'not_assessed',
         toolSelection: 'not_assessed',
         semanticStructure: 'not_assessed',
-        syntax: 'correct',
+        syntax: 'not_assessed',
         interpretation: 'not_assessed',
         verification: 'not_assessed',
         mechanical: 'not_assessed',
       },
       errorCodes: [],
       feedbackCode: 'GUIDED_STAGE_READ_COMPLETE',
-      feedbackMessage: `Etapa '${stage.title}' completada.`,
+      feedbackMessage: `Etapa '${stage.title}' revisada.`,
       requiresReview: false,
       stageCapabilities: capabilities,
     }
@@ -86,17 +86,17 @@ export function evaluateGuidedStage(
 
   if (!input.responseRaw || !input.responseRaw.trim()) {
     return {
-      status: 'incorrect',
+      status: 'not_assessed',
       dimensionResults: {
-        concept: 'incorrect',
+        concept: 'not_assessed',
         toolSelection: 'not_assessed',
         semanticStructure: 'not_assessed',
-        syntax: 'incorrect',
+        syntax: 'not_assessed',
         interpretation: 'not_assessed',
         verification: 'not_assessed',
         mechanical: 'not_assessed',
       },
-      errorCodes: ['answer_mismatch'],
+      errorCodes: ['missing_required_component'],
       feedbackCode: 'GUIDED_STAGE_RESPONSE_EMPTY',
       feedbackMessage: `La etapa '${stage.title}' requiere una respuesta para avanzar.`,
       requiresReview: false,
@@ -104,21 +104,20 @@ export function evaluateGuidedStage(
     }
   }
 
-  const status = 'correct'
   return {
-    status,
+    status: 'not_assessed',
     dimensionResults: {
-      concept: 'correct',
+      concept: 'not_assessed',
       toolSelection: 'not_assessed',
       semanticStructure: 'not_assessed',
-      syntax: 'correct',
+      syntax: 'not_assessed',
       interpretation: 'not_assessed',
       verification: 'not_assessed',
       mechanical: 'not_assessed',
     },
     errorCodes: [],
-    feedbackCode: 'GUIDED_STAGE_EXERCISE_PASSED',
-    feedbackMessage: `Ejercicio de la etapa '${stage.title}' resuelto correctamente.`,
+    feedbackCode: 'GUIDED_STAGE_RECORDED',
+    feedbackMessage: `Actividad guiada registrada para la etapa '${stage.title}'.`,
     requiresReview: false,
     stageCapabilities: capabilities,
   }

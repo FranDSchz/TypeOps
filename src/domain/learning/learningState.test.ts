@@ -33,15 +33,51 @@ describe('Learning State Machine (Hito 3)', () => {
     requiresReview: false,
   }
 
-  it('transita de new a learning al abrir la unidad', () => {
+  const partialEval: EvaluationResult = {
+    status: 'partial',
+    dimensionResults: {
+      concept: 'partial',
+      toolSelection: 'correct',
+      semanticStructure: 'incorrect',
+      syntax: 'incorrect',
+      interpretation: 'not_assessed',
+      verification: 'not_assessed',
+      mechanical: 'not_assessed',
+    },
+    errorCodes: ['syntax_mismatch'],
+    requiresReview: false,
+  }
+
+  const needsReviewEval: EvaluationResult = {
+    status: 'needs_review',
+    dimensionResults: {
+      concept: 'needs_review',
+      toolSelection: 'needs_review',
+      semanticStructure: 'needs_review',
+      syntax: 'needs_review',
+      interpretation: 'not_assessed',
+      verification: 'not_assessed',
+      mechanical: 'not_assessed',
+    },
+    errorCodes: ['unrecognized_valid_alternative'],
+    requiresReview: true,
+  }
+
+  it.each([
+    { statusName: 'correct', evalRes: correctEval },
+    { statusName: 'incorrect', evalRes: incorrectEval },
+    { statusName: 'partial', evalRes: partialEval },
+    { statusName: 'needs_review', evalRes: needsReviewEval },
+  ])('transita de new a learning con independentSuccessesCount: 0 para resultado $statusName (SA-01)', ({ evalRes }) => {
     const prog = computeNextLearningState({
       itemId: 'item-1',
       unitId: 'unit-linux-basics',
-      evaluationResult: correctEval,
+      evaluationResult: evalRes,
     })
 
     expect(prog.state).toBe('learning')
-    expect(prog.independentSuccessesCount).toBe(1)
+    expect(prog.independentSuccessesCount).toBe(0)
+    expect(prog.lastReasonCode).toBe('INITIAL_LEARNING_OPENED')
   })
 
   it('avanza a ready_for_assessment al acumular dos éxitos independientes sin ayuda', () => {

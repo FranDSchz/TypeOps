@@ -8,23 +8,34 @@ interface ItemFeedbackViewProps {
 }
 
 export function ItemFeedbackView({ item, evaluationResult, onContinue }: ItemFeedbackViewProps) {
+  const isSkipped = evaluationResult.feedbackCode === 'ITEM_SKIPPED'
+  const isGuided = item.kind === 'guided_practice'
   const isCorrect = evaluationResult.status === 'correct'
   const isNeedsReview = evaluationResult.status === 'needs_review'
-  const isIncorrect = evaluationResult.status === 'incorrect'
-  const isNotAssessed = evaluationResult.status === 'not_assessed'
-  const isGuided = item.kind === 'guided_practice'
+
+  let bannerTitle = '✖ Respuesta incorrecta'
+  if (isSkipped) {
+    bannerTitle = '⏭ Ejercicio omitido'
+  } else if (isGuided) {
+    if (evaluationResult.feedbackCode === 'GUIDED_STAGE_READ_COMPLETE') {
+      bannerTitle = '📝 Etapa revisada'
+    } else if (evaluationResult.feedbackCode === 'GUIDED_STAGE_RECORDED') {
+      bannerTitle = '📝 Práctica registrada'
+    } else if (evaluationResult.status === 'incorrect') {
+      bannerTitle = '✖ Respuesta incorrecta para la etapa'
+    } else {
+      bannerTitle = '📝 Práctica registrada'
+    }
+  } else if (isCorrect) {
+    bannerTitle = '✔ Respuesta correcta'
+  } else if (isNeedsReview) {
+    bannerTitle = '💬 Respuesta pendiente de revisión / no reconocida'
+  }
 
   return (
     <div className="item-feedback-view" role="region" aria-label="Resultado de la respuesta">
       <div className={`feedback-banner feedback-banner--${evaluationResult.status}`}>
-        <h3 className="feedback-banner-title">
-          {isNotAssessed && '⏭ Ejercicio omitido'}
-          {!isNotAssessed && isGuided && isCorrect && '📝 Etapa completada / Intento registrado'}
-          {!isNotAssessed && isGuided && isIncorrect && '✖ Respuesta incorrecta para la etapa'}
-          {!isNotAssessed && !isGuided && isCorrect && '✔ Respuesta correcta'}
-          {!isNotAssessed && !isGuided && isNeedsReview && '💬 Respuesta pendiente de revisión / no reconocida'}
-          {!isNotAssessed && !isGuided && isIncorrect && '✖ Respuesta incorrecta'}
-        </h3>
+        <h3 className="feedback-banner-title">{bannerTitle}</h3>
         {evaluationResult.feedbackMessage && (
           <p className="feedback-banner-desc">{evaluationResult.feedbackMessage}</p>
         )}

@@ -68,7 +68,7 @@ export function computeNextLearningState(
     return {
       unitId: options.unitId,
       state: 'learning',
-      independentSuccessesCount: 1,
+      independentSuccessesCount: 0,
       practicedItemIds,
       lastPracticedAt: nowIso,
       lastReasonCode: 'INITIAL_LEARNING_OPENED',

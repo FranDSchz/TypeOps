@@ -176,7 +176,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
     expect(alert).toHaveTextContent('Esta etapa requiere una respuesta para avanzar')
   })
 
-  it('muestra el diagnóstico real ante un comando arbitrario incorrecto en guided_practice', async () => {
+  it('muestra feedback neutral "Práctica registrada" ante cualquier respuesta no vacía en guided_practice (SA-02 & SA-03)', async () => {
     const user = userEvent.setup()
     render(<TestSessionApp db={testDb} pack={pack} />)
 
@@ -189,26 +189,9 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
     const submitBtn = screen.getByRole('button', { name: /Enviar respuesta/i })
     await user.click(submitBtn)
 
-    expect(await screen.findByText(/Respuesta incorrecta para la etapa/i)).toBeInTheDocument()
-    expect(screen.getByText(/no coincide con el ejercicio guiado/i)).toBeInTheDocument()
-  })
-
-  it('muestra feedback neutral "Etapa completada / Intento registrado" al responder el comando esperado en guided_practice sin afirmar "Respuesta correcta"', async () => {
-    const user = userEvent.setup()
-    render(<TestSessionApp db={testDb} pack={pack} />)
-
-    await user.click(screen.getByRole('button', { name: 'Iniciar sesión recomendada' }))
-    expect(await screen.findByRole('region', { name: /Sesión interactiva en curso/i })).toBeInTheDocument()
-
-    const input = screen.getByLabelText('Respuesta:')
-    await user.type(input, 'tail -n 20 /var/log/auth.log')
-
-    const submitBtn = screen.getByRole('button', { name: /Enviar respuesta/i })
-    await user.click(submitBtn)
-
-    // Debe mostrar la etiqueta neutral de etapa completada / intento registrado y NO "Respuesta correcta"
-    expect(await screen.findByText(/Etapa completada \/ Intento registrado/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Práctica registrada/i)).toBeInTheDocument()
     expect(screen.queryByText('✔ Respuesta correcta')).toBeNull()
+    expect(screen.queryByText('✖ Respuesta incorrecta')).toBeNull()
   })
 
   it('permite omitir un ejercicio mostrando el banner de ejercicio omitido', async () => {
