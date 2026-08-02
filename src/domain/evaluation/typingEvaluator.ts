@@ -63,38 +63,27 @@ export function evaluateTypingCopy(
   let mechanicalStatus: 'correct' | 'partial' | 'incorrect' | 'not_assessed' = 'not_assessed'
   let initialErrorCount: number | undefined
   let correctionCount: number | undefined
-  const hasMechanicalEvents = Boolean(options?.mechanicalEvents && options.mechanicalEvents.length > 0)
+  const hasMechanicalEvents = Boolean(options?.mechanicalObservation)
 
-  if (hasMechanicalEvents && options?.mechanicalEvents) {
-    const events = options.mechanicalEvents
-    let initErrors = 0
-    let corrections = 0
+  if (options?.mechanicalObservation) {
+    const obs = options.mechanicalObservation
+    initialErrorCount = obs.initialErrorsCount
+    correctionCount = obs.globalCorrectionsCount
 
-    events.forEach((ev) => {
-      if (ev.type === 'keydown' && ev.key === 'Backspace') {
-        corrections++
-      }
-      if (ev.producedChar && ev.targetChar && ev.producedChar !== ev.targetChar) {
-        initErrors++
-      }
-    })
-
-    initialErrorCount = initErrors
-    correctionCount = corrections
-
-    if (initialErrorCount > 0 || correctionCount > 0) {
-      errorCodes.push('mechanical_friction')
+    if (obs.isValid && (initialErrorCount > 0 || correctionCount > 0)) {
       mechanicalStatus = 'partial'
-    } else {
+    } else if (obs.isValid) {
       mechanicalStatus = 'correct'
     }
   }
 
+  // Regla autoritativa Subhito 5B: typing_copy NO aporta evidencia conceptual.
+  // Las dimensiones conceptuales se mantienen en 'not_assessed'.
   const dimensionResults: DimensionResults = {
-    concept: status,
+    concept: 'not_assessed',
     toolSelection: 'not_assessed',
     semanticStructure: 'not_assessed',
-    syntax: status,
+    syntax: 'not_assessed',
     interpretation: 'not_assessed',
     verification: 'not_assessed',
     mechanical: mechanicalStatus,

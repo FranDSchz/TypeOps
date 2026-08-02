@@ -23,7 +23,7 @@ describe('Domain Evaluation Engine (Hito 3)', () => {
   it('evalúa typing_copy determinísticamente y calcula diff sin métricas mecánicas inferidas cuando no hay eventos', () => {
     const res = evaluateContentItem(typingItem, 'ls -la /var/log')
     expect(res.status).toBe('correct')
-    expect(res.dimensionResults.syntax).toBe('correct')
+    expect(res.dimensionResults.syntax).toBe('not_assessed')
     expect(res.dimensionResults.mechanical).toBe('not_assessed')
     expect(res.errorCodes).toHaveLength(0)
 

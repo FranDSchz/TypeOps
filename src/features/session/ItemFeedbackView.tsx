@@ -31,6 +31,12 @@ export function ItemFeedbackView({ item, evaluationResult, onContinue }: ItemFee
     }
   } else if (isOpenQuestion) {
     bannerTitle = '📝 Respuesta guardada (Pendiente de revisión)'
+  } else if (item.kind === 'typing_copy') {
+    if (isCorrect) {
+      bannerTitle = '✔ Fidelidad de copia completa (100%)'
+    } else {
+      bannerTitle = '⚠ Copia enviada con discrepancias de caracteres'
+    }
   } else if (isCorrect) {
     bannerTitle = '✔ Respuesta correcta'
   } else if (isPartial) {

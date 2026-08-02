@@ -161,4 +161,109 @@ describe('Transfer Services — Import, Export, Conflict Policy & Atomic Rollbac
     expect(res2.success).toBe(true)
     expect(res2.actionTaken).toBe('skipped')
   })
+
+  // Subhito 5B — Pruebas de Exportación e Importación de Perfiles Mecánicos
+  describe('Perfiles Mecánicos en Backup y Restore (Subhito 5B)', () => {
+    it('Export v3: incluye mechanicalProfiles sin eventos DOM crudos', async () => {
+      await testDb.mechanicalProfiles.put({
+        profileKey: 'pack-foundations:1.0.0',
+        packId: 'pack-foundations',
+        packVersion: '1.0.0',
+        characterMetrics: {
+          a: { totalAppearances: 10, distinctAttemptsCount: 4, validLatenciesMs: [100, 110], medianLatencyMs: 105, hasSufficientSample: true },
+        },
+        sequenceMetrics: {},
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      })
+
+      const backup = await exportFullBackup(testDb)
+      expect(backup.mechanicalProfiles).toBeDefined()
+      expect(backup.mechanicalProfiles).toHaveLength(1)
+
+      const prof = backup.mechanicalProfiles?.[0]
+      expect(prof?.profileKey).toBe('pack-foundations:1.0.0')
+      expect(prof?.characterMetrics['a']?.totalAppearances).toBe(10)
+
+      // Verificación de ausencia de eventos DOM crudos
+      const jsonString = JSON.stringify(backup)
+      expect(jsonString).not.toContain('KeyboardEvent')
+      expect(jsonString).not.toContain('InputEvent')
+    })
+
+    it('Import v3: restaura mechanicalProfiles dentro de la transacción', async () => {
+      const preview1 = await generateImportPreview(officialPack, testDb)
+      await confirmImport(preview1, testDb)
+
+      await testDb.mechanicalProfiles.put({
+        profileKey: 'pack-foundations:1.0.0',
+        packId: 'pack-foundations',
+        packVersion: '1.0.0',
+        characterMetrics: {
+          s: { totalAppearances: 8, distinctAttemptsCount: 3, validLatenciesMs: [120], medianLatencyMs: 120, hasSufficientSample: true },
+        },
+        sequenceMetrics: {},
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      })
+
+      const backup = await exportFullBackup(testDb)
+
+      // Limpiar base de datos
+      await testDb.mechanicalProfiles.clear()
+      expect(await testDb.mechanicalProfiles.count()).toBe(0)
+
+      // Restaurar
+      const preview = await generateImportPreview(backup, testDb)
+      const result = await confirmImport(preview, testDb)
+      expect(result.success).toBe(true)
+
+      const restoredProf = await testDb.mechanicalProfiles.get('pack-foundations:1.0.0')
+      expect(restoredProf).toBeDefined()
+      expect(restoredProf?.characterMetrics['s']?.totalAppearances).toBe(8)
+    })
+
+    it('Backup v2 anterior: un envelope válido sin mechanicalProfiles se importa correctamente y preserva perfiles preexistentes', async () => {
+      const existingProfile = {
+        profileKey: 'pack-existing:1.0.0',
+        packId: 'pack-existing',
+        packVersion: '1.0.0',
+        characterMetrics: { a: { totalAppearances: 5, distinctAttemptsCount: 2, validLatenciesMs: [100], medianLatencyMs: 100, hasSufficientSample: false } },
+        sequenceMetrics: {},
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      }
+      await testDb.mechanicalProfiles.put(existingProfile)
+
+      const backupV2 = await exportFullBackup(testDb)
+      delete backupV2.mechanicalProfiles
+
+      const preview = await generateImportPreview(backupV2, testDb)
+      expect(preview.valid).toBe(true)
+
+      const result = await confirmImport(preview, testDb)
+      expect(result.success).toBe(true)
+
+      // La política preserva intactos los perfiles preexistentes si el sobre v2 no contiene la clave
+      const preserved = await testDb.mechanicalProfiles.get('pack-existing:1.0.0')
+      expect(preserved).toEqual(existingProfile)
+    })
+
+    it('Perfil inválido: rechaza sobre con perfiles malformados (contadores negativos / estructura inválida)', async () => {
+      const backupRaw = (await exportFullBackup(testDb)) as unknown as Record<string, unknown>
+      backupRaw.mechanicalProfiles = [
+        {
+          profileKey: 'invalid-key',
+          packId: 'pack-test',
+          packVersion: '1.0.0',
+          characterMetrics: {
+            a: { totalAppearances: -5, distinctAttemptsCount: -1, validLatenciesMs: [-10], hasSufficientSample: true },
+          },
+          sequenceMetrics: {},
+          updatedAt: '2026-08-01T10:00:00.000Z',
+        },
+      ]
+
+      const preview = await generateImportPreview(backupRaw, testDb)
+      expect(preview.valid).toBe(false)
+      expect(preview.errors.length).toBeGreaterThan(0)
+    })
+  })
 })

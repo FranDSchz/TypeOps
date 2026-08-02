@@ -1,6 +1,8 @@
 import type { ContentPack, ContentItemMode } from '../../domain/content/types'
 import type { EvaluationResult } from '../../domain/evaluation/types'
 import type { LearningState } from '../../domain/learning/learningState'
+import type { MechanicalObservation } from '../../domain/mechanical/mechanicalObservation'
+import type { SequenceMetric } from '../../domain/mechanical/mechanicalProfile'
 
 /**
  * Registros de base de datos para Dexie (Hito 2).
@@ -73,6 +75,18 @@ export interface AttemptRecord {
   confidence?: 'low' | 'medium' | 'high'
   durationMs: number
   createdAt: string
+  /** Observación mecánica inmutable consolidada de Subhito 5B */
+  mechanicalObservation?: MechanicalObservation
+}
+
+export interface MechanicalProfileRecord {
+  /** Clave primaria `${packId}:${packVersion}` */
+  profileKey: string
+  packId: string
+  packVersion: string
+  characterMetrics: Record<string, SequenceMetric>
+  sequenceMetrics: Record<string, SequenceMetric>
+  updatedAt: string
 }
 
 export interface LearningProgressRecord {

@@ -1,102 +1,93 @@
-import type { MechanicalCaptureEvent } from '../evaluation/types'
+import type { MechanicalObservation } from './mechanicalObservation'
+import { calculateMedianLatency, trimLatenciesWindow } from './mechanicalObservation'
 
 /**
- * Configuración central de umbrales mecánicos heurísticos y modificables.
+ * TypeOps V1 — Mechanical Profile Domain Engine (Subhito 5B)
+ *
+ * Muestra acotada y agregación acumulada de perfiles mecánicos por pack.
  */
-export interface MechanicalConfig {
-  minCharAppearances: number
-  minBigramAppearances: number
-  minSequenceAppearances: number
-  initialErrorThreshold: number
-  correctionRateThreshold: number
-  latencyMultiplierThreshold: number
-}
-
-export const DEFAULT_MECHANICAL_CONFIG: MechanicalConfig = {
-  minCharAppearances: 8,
-  minBigramAppearances: 6,
-  minSequenceAppearances: 4,
-  initialErrorThreshold: 0.20,
-  correctionRateThreshold: 0.25,
-  latencyMultiplierThreshold: 1.5,
-}
 
 export interface SequenceMetric {
-  sequence: string
-  attemptsCount: number
   totalAppearances: number
-  initialErrors: number
-  corrections: number
-  latenciesMs: number[]
-  medianLatencyMs?: number
+  distinctAttemptsCount: number
+  validLatenciesMs: number[] // Máximo 20 observaciones en ventana deslizante
+  medianLatencyMs?: number | undefined
   hasSufficientSample: boolean
-  isFrictionCandidate: boolean
 }
 
-export interface MechanicalProfile {
+export interface MechanicalProfileDomain {
+  profileKey: string
+  packId: string
+  packVersion: string
   characterMetrics: Record<string, SequenceMetric>
   sequenceMetrics: Record<string, SequenceMetric>
-  lastObservationAt?: string
+  updatedAt: string
 }
 
+export type MechanicalProfile = MechanicalProfileDomain
+
 /**
- * Procesa eventos de captura mecánica y actualiza métricas acumuladas de forma pura.
+ * Procesa una MechanicalObservation inmutable y actualiza el perfil acumulado.
+ * Si la observación es inválida (isValid === false), la agregación es un NO-OP estricto.
  */
-export function processMechanicalEvents(
-  events: MechanicalCaptureEvent[],
-  existingProfile?: MechanicalProfile,
-  config: MechanicalConfig = DEFAULT_MECHANICAL_CONFIG,
-): MechanicalProfile {
-  const profile: MechanicalProfile = existingProfile ?? {
+export function aggregateObservationIntoProfile(
+  observation: MechanicalObservation,
+  existingProfile?: MechanicalProfileDomain,
+  profileKey = 'default:1.0.0',
+  packId = 'default',
+  packVersion = '1.0.0',
+): MechanicalProfileDomain {
+  const profile: MechanicalProfileDomain = existingProfile ?? {
+    profileKey,
+    packId,
+    packVersion,
     characterMetrics: {},
     sequenceMetrics: {},
+    updatedAt: new Date().toISOString(),
   }
 
-  if (events.length === 0) return profile
+  // SI LA OBSERVACIÓN ES INVÁLIDA, NO-OP ESTRICTO (No altera ninguna métrica)
+  if (!observation.isValid) {
+    return profile
+  }
 
-  for (let i = 0; i < events.length; i++) {
-    const ev = events[i]
-    if (!ev || ev.type !== 'keydown' || !ev.targetChar) continue
+  for (const [seq, stats] of Object.entries(observation.observedSequences)) {
+    const isChar = seq.length === 1
+    const targetMap = isChar ? profile.characterMetrics : profile.sequenceMetrics
 
-    const char = ev.targetChar
-    const metric = profile.characterMetrics[char] ?? {
-      sequence: char,
-      attemptsCount: 0,
+    const currentMetric: SequenceMetric = targetMap[seq] ?? {
       totalAppearances: 0,
-      initialErrors: 0,
-      corrections: 0,
-      latenciesMs: [],
+      distinctAttemptsCount: 0,
+      validLatenciesMs: [],
       hasSufficientSample: false,
-      isFrictionCandidate: false,
     }
 
-    metric.totalAppearances++
-    if (ev.producedChar && ev.producedChar !== ev.targetChar) {
-      metric.initialErrors++
-    }
-    if (ev.key === 'Backspace') {
-      metric.corrections++
-    }
+    currentMetric.totalAppearances += stats.totalAppearances
+    currentMetric.distinctAttemptsCount += 1
 
-    const prevEv = events[i - 1]
-    if (i > 0 && prevEv?.timestampMs !== undefined) {
-      const lat = ev.timestampMs - prevEv.timestampMs
-      if (lat > 0 && lat < 5000) {
-        metric.latenciesMs.push(lat)
-      }
+    if (stats.validLatenciesMs.length > 0) {
+      currentMetric.validLatenciesMs = trimLatenciesWindow(
+        [...currentMetric.validLatenciesMs, ...stats.validLatenciesMs],
+        20,
+      )
+      currentMetric.medianLatencyMs = calculateMedianLatency(currentMetric.validLatenciesMs)
     }
 
-    metric.hasSufficientSample = metric.totalAppearances >= config.minCharAppearances
-    const errorRate = metric.totalAppearances > 0 ? metric.initialErrors / metric.totalAppearances : 0
-    const corrRate = metric.totalAppearances > 0 ? metric.corrections / metric.totalAppearances : 0
+    // Evaluación de muestra suficiente según diversidad de intentos
+    if (isChar) {
+      currentMetric.hasSufficientSample =
+        currentMetric.totalAppearances >= 8 && currentMetric.distinctAttemptsCount >= 3
+    } else if (seq.length === 2) {
+      currentMetric.hasSufficientSample =
+        currentMetric.totalAppearances >= 6 && currentMetric.distinctAttemptsCount >= 3
+    } else {
+      currentMetric.hasSufficientSample =
+        currentMetric.totalAppearances >= 4 && currentMetric.distinctAttemptsCount >= 2
+    }
 
-    metric.isFrictionCandidate =
-      metric.hasSufficientSample &&
-      (errorRate >= config.initialErrorThreshold || corrRate >= config.correctionRateThreshold)
-
-    profile.characterMetrics[char] = metric
+    targetMap[seq] = currentMetric
   }
 
-  profile.lastObservationAt = new Date().toISOString()
+  profile.updatedAt = new Date().toISOString()
   return profile
 }

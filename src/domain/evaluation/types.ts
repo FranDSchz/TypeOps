@@ -55,13 +55,15 @@ export interface EvaluationResult {
   requiresReview: boolean
 }
 
+import type { MechanicalObservation } from '../mechanical/mechanicalObservation'
+
 export interface EvaluationOptions {
   /** Pistas utilizadas en el intento */
   hintsUsedCount?: number
   /** Autoevaluación o confianza declarada ('low' | 'medium' | 'high') */
   confidence?: 'low' | 'medium' | 'high'
-  /** Eventos de captura mecánica (keydown/input) si están disponibles */
-  mechanicalEvents?: MechanicalCaptureEvent[]
+  /** Observación mecánica inmutable consolidada (Subhito 5B) */
+  mechanicalObservation?: MechanicalObservation
 }
 
 export interface MechanicalCaptureEvent {

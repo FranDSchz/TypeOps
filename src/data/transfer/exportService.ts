@@ -52,6 +52,11 @@ export async function exportFullBackup(
     },
   }
 
+  const profiles = await db.mechanicalProfiles.toArray()
+  if (profiles.length > 0) {
+    envelope.mechanicalProfiles = profiles
+  }
+
   if (Object.keys(settings).length > 0) {
     envelope.settings = settings
   }

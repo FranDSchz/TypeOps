@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import Dexie, { type Table } from 'dexie'
 import { TypeOpsDatabase } from './database'
-import type { ContentPackRecord } from './records'
+import type { ContentPackRecord, SessionRecord, AttemptRecord, LearningProgressRecord } from './records'
 import officialPack from '../../content/typeops-foundations-es-ar/pack.json'
 import type { ContentPack } from '../../domain/content/types'
 
@@ -92,6 +92,133 @@ describe('Dexie Real v1 -> v2 Database Migration (SA-04)', () => {
     } finally {
       if (dbV1.isOpen()) {
         dbV1.close()
+      }
+    }
+  })
+
+class V2Database extends Dexie {
+  contentPacks!: Table<ContentPackRecord, string>
+  settings!: Table<SettingRecord, string>
+  sessions!: Table<SessionRecord, string>
+  attempts!: Table<AttemptRecord, string>
+  learningProgress!: Table<LearningProgressRecord, string>
+
+  constructor(databaseName: string) {
+    super(databaseName)
+    this.version(2).stores({
+      contentPacks: 'packId, packVersion, schemaVersion, title, checksum',
+      settings: 'key',
+      sessions: 'sessionId, mode, status, startedAt',
+      attempts: 'attemptId, sessionId, itemId, unitId, createdAt',
+      learningProgress: 'compositeUnitKey, unitId, packId, state, nextReviewAt, lastPracticedAt',
+    })
+  }
+}
+
+  it('migra una base v2 a v3 preservando registros en las 5 tablas e instanciando la tabla mechanicalProfiles', async () => {
+    const dbName = `TypeOpsDB_Migration_V2_V3_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`
+    const dbV2 = new V2Database(dbName)
+    try {
+      // 1. Poblar las 5 tablas en versión 2 del esquema
+      await dbV2.settings.put({ key: 'activePackId', value: 'pack-v2-test', updatedAt: '2026-08-01T10:00:00.000Z' })
+      await dbV2.contentPacks.put({
+        packId: 'pack-v2-test',
+        packVersion: '1.0.0',
+        schemaVersion: '1.0',
+        title: 'Pack V2 Test',
+        locale: 'es-AR',
+        checksum: 'sha256-v2',
+        content: officialPack as ContentPack,
+        importedAt: '2026-08-01T10:00:00.000Z',
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      })
+      await dbV2.sessions.put({
+        sessionId: 'sess-v2-test',
+        packId: 'pack-v2-test',
+        packVersion: '1.0.0',
+        mode: 'typing',
+        presetName: '5_minutes',
+        startedAt: '2026-08-01T10:00:00.000Z',
+        deadlineAt: '2026-08-01T10:05:00.000Z',
+        planItems: [],
+        currentIndex: 0,
+        status: 'active',
+        completionReason: null,
+        createdAt: '2026-08-01T10:00:00.000Z',
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      })
+      await dbV2.attempts.put({
+        attemptId: 'att-v2-test',
+        sessionId: 'sess-v2-test',
+        packId: 'pack-v2-test',
+        packVersion: '1.0.0',
+        itemId: 'type-ls-1',
+        unitId: 'unit-typing-1',
+        responseRaw: 'ls -la',
+        evaluationResult: {
+          status: 'correct',
+          dimensionResults: { concept: 'not_assessed', toolSelection: 'not_assessed', semanticStructure: 'not_assessed', syntax: 'not_assessed', interpretation: 'not_assessed', verification: 'not_assessed', mechanical: 'correct' },
+          errorCodes: [],
+          feedbackCode: 'OK',
+          feedbackMessage: 'OK',
+          requiresReview: false,
+        },
+        workflowStatus: 'evaluated',
+        hintsUsedCount: 0,
+        durationMs: 2000,
+        createdAt: '2026-08-01T10:00:00.000Z',
+      })
+      await dbV2.learningProgress.put({
+        compositeUnitKey: 'pack-v2-test:unit-typing-1',
+        packId: 'pack-v2-test',
+        unitId: 'unit-typing-1',
+        state: 'learning',
+        independentSuccessesCount: 0,
+        practicedItemIds: ['type-ls-1'],
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      })
+
+      dbV2.close()
+
+      // 2. Reabrir mediante TypeOpsDatabase (v3) en la misma base
+      const dbV3 = new TypeOpsDatabase(dbName)
+      try {
+        // Verificar que las 5 tablas conservan sus datos intactos
+        const setting = await dbV3.settings.get('activePackId')
+        expect(setting?.value).toBe('pack-v2-test')
+
+        const packRecord = await dbV3.contentPacks.get('pack-v2-test')
+        expect(packRecord?.title).toBe('Pack V2 Test')
+
+        const sessionRecord = await dbV3.sessions.get('sess-v2-test')
+        expect(sessionRecord?.mode).toBe('typing')
+
+        const attemptRecord = await dbV3.attempts.get('att-v2-test')
+        expect(attemptRecord?.attemptId).toBe('att-v2-test')
+
+        const progressRecord = await dbV3.learningProgress.get('pack-v2-test:unit-typing-1')
+        expect(progressRecord?.state).toBe('learning')
+
+        // Verificar que la tabla mechanicalProfiles funciona normalmente
+        expect(dbV3.mechanicalProfiles).toBeDefined()
+        await dbV3.mechanicalProfiles.put({
+          profileKey: 'pack-v2-test:1.0.0',
+          packId: 'pack-v2-test',
+          packVersion: '1.0.0',
+          characterMetrics: {},
+          sequenceMetrics: {},
+          updatedAt: new Date().toISOString(),
+        })
+
+        const profileRecord = await dbV3.mechanicalProfiles.get('pack-v2-test:1.0.0')
+        expect(profileRecord?.profileKey).toBe('pack-v2-test:1.0.0')
+      } finally {
+        dbV3.close()
+        await dbV3.delete()
+      }
+    } finally {
+      if (dbV2.isOpen()) {
+        dbV2.close()
       }
     }
   })

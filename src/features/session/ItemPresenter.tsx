@@ -1,17 +1,38 @@
 import type { SyntheticEvent } from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ContentItem } from '../../domain/content/types'
 import { getStageCapabilities } from '../../domain/evaluation/guidedEvaluator'
 import { validateResponsePresent } from '../../domain/evaluation/responseValidation'
 
+import { useMechanicalCapture } from './useMechanicalCapture'
+import type { EvaluationOptions } from '../../domain/evaluation/types'
+
 interface ItemPresenterProps {
   item: ContentItem
   activeHintLevel: number
-  onSubmitResponse: (responseRaw: unknown) => void
   disabled?: boolean
+  onSubmitResponse: (responseRaw: unknown, durationMs?: number, options?: EvaluationOptions) => void
+  onUseHint?: () => void
 }
 
-export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disabled }: ItemPresenterProps) {
+export function ItemPresenter({
+  item,
+  activeHintLevel,
+  disabled = false,
+  onSubmitResponse,
+}: ItemPresenterProps) {
+  const mechanicalCapture = useMechanicalCapture()
+  const { resetCapture } = mechanicalCapture
+  const [pasteNotice, setPasteNotice] = useState(false)
+
+  // Reset del hook de captura al cambiar de ítem
+  useEffect(() => {
+    setTextInput('')
+    setPasteNotice(false)
+    setValidationError(null)
+    resetCapture()
+  }, [item.itemId, resetCapture])
+
   // Estado local de respuesta según el tipo de ítem
   const [textInput, setTextInput] = useState('')
   const [singleChoiceId, setSingleChoiceId] = useState('')
@@ -82,6 +103,7 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
 
     if (!validation.isValid) {
       setValidationError(validation.errorMessage ?? 'Respuesta requerida para enviar.')
+      resetCapture()
       const targetId = validation.targetElementId
       if (targetId) {
         setTimeout(() => {
@@ -95,7 +117,20 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
     }
 
     setValidationError(null)
-    onSubmitResponse(rawResponse)
+
+    if (item.kind === 'typing_copy') {
+      mechanicalCapture.markSubmitting()
+      const declaredSeqs = item.mechanicalSequences.map((s) => (typeof s === 'string' ? s : s.value))
+      const obs = mechanicalCapture.consolidate(item.targetText, textInput, declaredSeqs)
+      try {
+        onSubmitResponse(rawResponse, undefined, { mechanicalObservation: obs })
+      } catch (err) {
+        resetCapture()
+        throw err
+      }
+    } else {
+      onSubmitResponse(rawResponse)
+    }
   }
 
   function toggleEvidence(evId: string) {
@@ -116,9 +151,11 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
 
       {item.context && <p className="item-context">{item.context}</p>}
 
-      <div className="item-task-box">
-        <strong>Tarea:</strong> {item.task}
-      </div>
+      {item.task && (
+        <div className="item-task-box">
+          <strong>Tarea:</strong> {item.task}
+        </div>
+      )}
 
       {visibleHints.length > 0 && (
         <div className="hints-box" role="region" aria-label="Pistas activadas">
@@ -143,6 +180,11 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
         {/* Render según el kind del walking skeleton */}
         {item.kind === 'typing_copy' && (
           <div className="input-group">
+            {pasteNotice && (
+              <div className="notice-box notice-box--info" role="status">
+                ℹ Pegado detectado. Se evaluará la precisión final pero no alimentará el perfil de fricción.
+              </div>
+            )}
             <label htmlFor="typing-input" className="input-label">
               Texto a copiar:
             </label>
@@ -157,6 +199,16 @@ export function ItemPresenter({ item, activeHintLevel, onSubmitResponse, disable
               type="text"
               className="form-control text-mono"
               value={textInput}
+              onKeyDown={mechanicalCapture.handleKeyDown}
+              onBeforeInput={mechanicalCapture.handleBeforeInput}
+              onInput={mechanicalCapture.handleInput}
+              onPaste={() => {
+                setPasteNotice(true)
+                mechanicalCapture.handlePaste()
+              }}
+              onBlur={mechanicalCapture.handleBlur}
+              onCompositionStart={mechanicalCapture.handleCompositionStart}
+              onCompositionEnd={mechanicalCapture.handleCompositionEnd}
               onChange={(e) => {
                 setValidationError(null)
                 setTextInput(e.target.value)

@@ -209,9 +209,17 @@ export async function confirmImport(
     }
 
     try {
-      await db.transaction('rw', [db.contentPacks, db.settings], async () => {
+      await db.transaction('rw', [db.contentPacks, db.settings, db.mechanicalProfiles], async () => {
         for (const record of recordsToStore) {
           await db.contentPacks.put(record)
+        }
+
+        if (Array.isArray(envelope.mechanicalProfiles)) {
+          for (const prof of envelope.mechanicalProfiles) {
+            if (prof.profileKey && prof.packId) {
+              await db.mechanicalProfiles.put(prof)
+            }
+          }
         }
 
         if (envelope.settings?.activePackId) {

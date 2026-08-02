@@ -24,6 +24,8 @@ export interface SubmitAttemptResult {
   isSessionCompleted: boolean
 }
 
+import { aggregateObservationIntoProfile } from '../../domain/mechanical/mechanicalProfile'
+
 export async function submitAttempt(options: SubmitAttemptOptions): Promise<SubmitAttemptResult> {
   const { db, attemptId, sessionId, item, packId, packVersion, responseRaw, evaluationOptions, durationMs } = options
 
@@ -39,7 +41,7 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
     }
   }
 
-  return db.transaction('rw', [db.attempts, db.learningProgress, db.sessions], async () => {
+  return db.transaction('rw', [db.attempts, db.learningProgress, db.sessions, db.mechanicalProfiles], async () => {
     // 2. Verificación de idempotencia
     const existingAttempt = await db.attempts.get(attemptId)
     if (existingAttempt) {
@@ -92,7 +94,7 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
     const unitId = item.unitIds[0] ?? item.itemId
     const nowIso = new Date().toISOString()
 
-    // 3. Crear registro de intento
+    // 3. Crear registro de intento (con observation embebida si existe)
     const attemptRecord: AttemptRecord = {
       attemptId,
       sessionId,
@@ -108,7 +110,25 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
       createdAt: nowIso,
     }
 
+    if (evaluationOptions?.mechanicalObservation) {
+      attemptRecord.mechanicalObservation = evaluationOptions.mechanicalObservation
+    }
+
     await db.attempts.put(attemptRecord)
+
+    // 3.1. Agregación atómica e idempotente del Perfil Mecánico (Subhito 5B)
+    if (attemptRecord.mechanicalObservation && attemptRecord.mechanicalObservation.isValid) {
+      const profileKey = `${packId}:${packVersion}`
+      const existingProfileRecord = await db.mechanicalProfiles.get(profileKey)
+      const updatedProfile = aggregateObservationIntoProfile(
+        attemptRecord.mechanicalObservation,
+        existingProfileRecord,
+        profileKey,
+        packId,
+        packVersion,
+      )
+      await db.mechanicalProfiles.put(updatedProfile)
+    }
 
     // 4. Actualizar progreso de aprendizaje con clave primaria compuesta ${packId}:${unitId}
     const compositeUnitKey = `${packId}:${unitId}`
@@ -116,6 +136,35 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
 
     if (isSkipped || item.kind === 'open_question') {
       // Omisión y open_question (pendiente) NO crean ni modifican el progreso de aprendizaje
+    } else if (item.kind === 'typing_copy') {
+      // Regla autoritativa Subhito 5B: typing_copy NO otorga éxitos independientes ni promueve a practicing/mastered.
+      // Abre new -> learning por exposición si es nueva (count 0), o preserva exactamente el estado existente.
+      const existingPracticed = currentProgressRecord?.practicedItemIds ?? []
+      const updatedPracticedItemIds = Array.from(new Set([...existingPracticed, item.itemId]))
+      const nextState = !currentProgressRecord || currentProgressRecord.state === 'new'
+        ? 'learning'
+        : currentProgressRecord.state
+      const independentSuccessesCount = currentProgressRecord?.independentSuccessesCount ?? 0
+
+      const updatedProgressRecord: LearningProgressRecord = {
+        compositeUnitKey,
+        packId,
+        unitId,
+        state: nextState,
+        independentSuccessesCount,
+        practicedItemIds: updatedPracticedItemIds,
+        lastPracticedAt: nowIso,
+        lastReasonCode: !currentProgressRecord || currentProgressRecord.state === 'new'
+          ? 'TYPING_EXPOSURE_OPENED'
+          : (currentProgressRecord.lastReasonCode ?? 'TYPING_PRACTICED'),
+        updatedAt: nowIso,
+      }
+
+      if (currentProgressRecord?.nextReviewAt !== undefined) {
+        updatedProgressRecord.nextReviewAt = currentProgressRecord.nextReviewAt
+      }
+
+      await db.learningProgress.put(updatedProgressRecord)
     } else if (item.kind === 'guided_practice') {
       const existingPracticed = currentProgressRecord?.practicedItemIds ?? []
       const updatedPracticedItemIds = Array.from(new Set([...existingPracticed, item.itemId]))

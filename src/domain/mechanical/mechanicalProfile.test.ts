@@ -1,34 +1,59 @@
 import { describe, it, expect } from 'vitest'
-import { processMechanicalEvents, DEFAULT_MECHANICAL_CONFIG } from './mechanicalProfile'
-import type { MechanicalCaptureEvent } from '../evaluation/types'
+import { aggregateObservationIntoProfile } from './mechanicalProfile'
+import type { MechanicalObservation } from './mechanicalObservation'
 
-describe('Mechanical Profile Aggregator (Hito 3)', () => {
-  it('no marca candidatos a fricción si no alcanza la muestra mínima', () => {
-    const events: MechanicalCaptureEvent[] = [
-      { type: 'keydown', key: 'a', targetChar: 'a', producedChar: 'b', timestampMs: 100 },
-      { type: 'keydown', key: 'a', targetChar: 'a', producedChar: 'b', timestampMs: 200 },
-    ]
+describe('Mechanical Profile Aggregation (Subhito 5B)', () => {
+  const validObservation: MechanicalObservation = {
+    isValid: true,
+    validityLimitations: [],
+    targetLength: 5,
+    finalLength: 5,
+    initialErrorsCount: 0,
+    globalCorrectionsCount: 0,
+    finalCorrectCharsCount: 5,
+    observedSequences: {
+      l: { totalAppearances: 3, validLatenciesMs: [100, 110, 105] },
+      s: { totalAppearances: 3, validLatenciesMs: [120, 115, 125] },
+    },
+  }
 
-    const profile = processMechanicalEvents(events)
-    expect(profile.characterMetrics['a']?.hasSufficientSample).toBe(false)
-    expect(profile.characterMetrics['a']?.isFrictionCandidate).toBe(false)
+  const invalidObservation: MechanicalObservation = {
+    ...validObservation,
+    isValid: false,
+    validityLimitations: ['paste_detected'],
+  }
+
+  it('observación inválida (isValid === false) es un NO-OP estricto y no modifica el perfil', () => {
+    const profile = aggregateObservationIntoProfile(invalidObservation, undefined, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    expect(profile.characterMetrics['l']).toBeUndefined()
+    expect(Object.keys(profile.characterMetrics)).toHaveLength(0)
   })
 
-  it('marca candidato a fricción al alcanzar la muestra mínima y superar la tasa de error', () => {
-    const events: MechanicalCaptureEvent[] = []
-    for (let i = 0; i < DEFAULT_MECHANICAL_CONFIG.minCharAppearances; i++) {
-      events.push({
-        type: 'keydown',
-        key: 'x',
-        targetChar: 'x',
-        producedChar: i < 3 ? 'z' : 'x', // 3/8 = 37.5% error rate (> 20%)
-        timestampMs: 100 * (i + 1),
-      })
-    }
+  it('observación válida agrega métricas e incrementa distinctAttemptsCount', () => {
+    let profile = aggregateObservationIntoProfile(validObservation, undefined, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    expect(profile.characterMetrics['l']).toBeDefined()
+    expect(profile.characterMetrics['l']?.distinctAttemptsCount).toBe(1)
+    expect(profile.characterMetrics['l']?.totalAppearances).toBe(3)
+    expect(profile.characterMetrics['l']?.hasSufficientSample).toBe(false) // Requiere >= 8 apariciones y >= 3 intentos
 
-    const profile = processMechanicalEvents(events)
-    const metric = profile.characterMetrics['x']
-    expect(metric?.hasSufficientSample).toBe(true)
-    expect(metric?.isFrictionCandidate).toBe(true)
+    // Segundo intento válido
+    profile = aggregateObservationIntoProfile(validObservation, profile, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    expect(profile.characterMetrics['l']?.distinctAttemptsCount).toBe(2)
+    expect(profile.characterMetrics['l']?.totalAppearances).toBe(6)
+    expect(profile.characterMetrics['l']?.hasSufficientSample).toBe(false)
+
+    // Tercer intento válido -> alcanza 9 apariciones en 3 intentos distintos
+    profile = aggregateObservationIntoProfile(validObservation, profile, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    expect(profile.characterMetrics['l']?.distinctAttemptsCount).toBe(3)
+    expect(profile.characterMetrics['l']?.totalAppearances).toBe(9)
+    expect(profile.characterMetrics['l']?.hasSufficientSample).toBe(true)
+  })
+
+  it('mantiene la ventana deslizante acotada a máximo 20 latencias', () => {
+    let profile = aggregateObservationIntoProfile(validObservation, undefined, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    for (let i = 0; i < 10; i++) {
+      profile = aggregateObservationIntoProfile(validObservation, profile, 'pack-1:1.0.0', 'pack-1', '1.0.0')
+    }
+    expect(profile.characterMetrics['l']?.validLatenciesMs.length).toBeLessThanOrEqual(20)
   })
 })

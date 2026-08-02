@@ -304,4 +304,209 @@ describe('TransactionalSessionService (Saneamiento V1)', () => {
     const allAttempts = await testDb.attempts.toArray()
     expect(allAttempts).toHaveLength(1)
   })
+
+  // Subhito 5B — Pruebas Transaccionales de Typing
+  describe('Pruebas Transaccionales de Typing (Subhito 5B)', () => {
+    const typingItem = pack.items.find((i) => i.kind === 'typing_copy') as ContentItem
+    const unitId = typingItem.unitIds[0] ?? typingItem.itemId
+
+    const validObs = {
+      isValid: true,
+      validityLimitations: [],
+      targetLength: 15,
+      finalLength: 15,
+      initialErrorsCount: 0,
+      globalCorrectionsCount: 0,
+      finalCorrectCharsCount: 15,
+      observedSequences: {
+        l: { totalAppearances: 2, validLatenciesMs: [100, 110] },
+      },
+    }
+
+    const invalidObs = {
+      isValid: false,
+      validityLimitations: ['paste_detected' as const],
+      targetLength: 15,
+      finalLength: 15,
+      initialErrorsCount: 0,
+      globalCorrectionsCount: 0,
+      finalCorrectCharsCount: 15,
+      observedSequences: {},
+    }
+
+    it('A. Intento válido nuevo: persiste AttemptRecord con observation, crea MechanicalProfileRecord, avanza sesión y pasa new -> learning con 0 éxitos', async () => {
+      const attemptId = 'att-typing-valid-new'
+
+      const result = await submitAttempt({
+        db: testDb,
+        attemptId,
+        sessionId: 'sess-test-1',
+        item: typingItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: 'ls -la /var/log',
+        evaluationOptions: { mechanicalObservation: validObs },
+        durationMs: 3000,
+      })
+
+      expect(result.attempt.attemptId).toBe(attemptId)
+      expect(result.attempt.mechanicalObservation).toBeDefined()
+      expect(result.attempt.mechanicalObservation?.isValid).toBe(true)
+
+      // Avance de sesión
+      const session = await testDb.sessions.get('sess-test-1')
+      expect(session?.currentIndex).toBe(1)
+
+      // Perfil mecánico creado
+      const profileKey = `${pack.packId}:${pack.packVersion}`
+      const profile = await testDb.mechanicalProfiles.get(profileKey)
+      expect(profile).toBeDefined()
+      expect(profile?.characterMetrics['l']).toBeDefined()
+
+      // Progreso conceptual: new -> learning con 0 éxitos
+      const compositeKey = `${pack.packId}:${unitId}`
+      const progress = await testDb.learningProgress.get(compositeKey)
+      expect(progress?.state).toBe('learning')
+      expect(progress?.independentSuccessesCount).toBe(0)
+    })
+
+    it('B. Progreso conceptual existente (practicing/mastered): preserva intactos state, éxitos, timestamps y razón', async () => {
+      const compositeKey = `${pack.packId}:${unitId}`
+      const existingProgress: LearningProgressRecord = {
+        compositeUnitKey: compositeKey,
+        packId: pack.packId,
+        unitId,
+        state: 'practicing',
+        independentSuccessesCount: 2,
+        practicedItemIds: ['item-old-1'],
+        lastPracticedAt: '2026-08-01T10:00:00.000Z',
+        lastReasonCode: 'INDEPENDENT_SUCCESS_PRACTICING',
+        updatedAt: '2026-08-01T10:00:00.000Z',
+      }
+      await testDb.learningProgress.put(existingProgress)
+
+      await submitAttempt({
+        db: testDb,
+        attemptId: 'att-typing-existing-prog',
+        sessionId: 'sess-test-1',
+        item: typingItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: 'ls -la /var/log',
+        evaluationOptions: { mechanicalObservation: validObs },
+        durationMs: 2500,
+      })
+
+      const afterProgress = await testDb.learningProgress.get(compositeKey)
+      expect(afterProgress?.state).toBe('practicing')
+      expect(afterProgress?.independentSuccessesCount).toBe(2)
+      expect(afterProgress?.practicedItemIds).toContain(typingItem.itemId)
+      expect(afterProgress?.practicedItemIds).toContain('item-old-1')
+    })
+
+    it('C. Observación inválida (paste_detected / focus_lost): persiste intento, avanza sesión, evalúa fidelidad, pero NO modifica MechanicalProfileRecord', async () => {
+      const attemptId = 'att-typing-invalid-obs'
+
+      await submitAttempt({
+        db: testDb,
+        attemptId,
+        sessionId: 'sess-test-1',
+        item: typingItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: 'ls -la /var/log',
+        evaluationOptions: { mechanicalObservation: invalidObs },
+        durationMs: 1000,
+      })
+
+      // Intento persistido
+      const attempt = await testDb.attempts.get(attemptId)
+      expect(attempt).toBeDefined()
+      expect(attempt?.mechanicalObservation?.isValid).toBe(false)
+
+      // Sesión avanzada
+      const session = await testDb.sessions.get('sess-test-1')
+      expect(session?.currentIndex).toBe(1)
+
+      // Perfil mecánico NO creado
+      const profileKey = `${pack.packId}:${pack.packVersion}`
+      const profile = await testDb.mechanicalProfiles.get(profileKey)
+      expect(profile).toBeUndefined()
+    })
+
+    it('D. Idempotencia ante envíos duplicados con el mismo attemptId', async () => {
+      const attemptId = 'att-idempotent-repeat'
+
+      const res1 = await submitAttempt({
+        db: testDb,
+        attemptId,
+        sessionId: 'sess-test-1',
+        item: typingItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: 'ls -la /var/log',
+        evaluationOptions: { mechanicalObservation: validObs },
+        durationMs: 3000,
+      })
+
+      // Reenvío con observación diferente
+      const differentObs = { ...validObs, finalLength: 10 }
+      const res2 = await submitAttempt({
+        db: testDb,
+        attemptId,
+        sessionId: 'sess-test-1',
+        item: typingItem,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        responseRaw: 'ls -la /var/log',
+        evaluationOptions: { mechanicalObservation: differentObs },
+        durationMs: 3000,
+      })
+
+      expect(res1.attempt.attemptId).toBe(attemptId)
+      expect(res2.attempt.attemptId).toBe(attemptId)
+
+      // Sólo 1 intento almacenado en la DB
+      const attempts = await testDb.attempts.toArray()
+      expect(attempts).toHaveLength(1)
+
+      // La sesión avanzó 1 vez y no 2
+      const session = await testDb.sessions.get('sess-test-1')
+      expect(session?.currentIndex).toBe(1)
+    })
+
+    it('E. Rollback: si ocurre un fallo dentro de submitAttempt, revierte atómicamente la transacción (sin dejar intento ni perfil)', async () => {
+      const attemptId = 'att-rollback-submit-test'
+      const originalSessionsPut = testDb.sessions.put.bind(testDb.sessions)
+      testDb.sessions.put = () => {
+        throw new Error('SIMULATED_TRANSACTION_FAILURE_IN_SUBMIT')
+      }
+
+      try {
+        await submitAttempt({
+          db: testDb,
+          attemptId,
+          sessionId: 'sess-test-1',
+          item: typingItem,
+          packId: pack.packId,
+          packVersion: pack.packVersion,
+          responseRaw: 'ls -la /var/log',
+          evaluationOptions: { mechanicalObservation: validObs },
+          durationMs: 2500,
+        })
+      } catch (err) {
+        expect(String(err)).toContain('SIMULATED_TRANSACTION_FAILURE_IN_SUBMIT')
+      } finally {
+        testDb.sessions.put = originalSessionsPut
+      }
+
+      // Comprobar que la transacción se revirtió: ni el intento ni el perfil mecánico existen
+      const attempt = await testDb.attempts.get(attemptId)
+      expect(attempt).toBeUndefined()
+
+      const profileKey = `${pack.packId}:${pack.packVersion}`
+      const profile = await testDb.mechanicalProfiles.get(profileKey)
+      expect(profile).toBeUndefined()
+    })
+  })
 })

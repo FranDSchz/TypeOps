@@ -1,8 +1,8 @@
 import type { ContentPack, ContentValidationError } from '../../domain/content/types'
-import type { AppSettings } from '../db/records'
+import type { AppSettings, MechanicalProfileRecord } from '../db/records'
 
 /**
- * Sobres de exportación e intercambio de datos (Hito 2).
+ * Sobres de exportación e intercambio de datos (Hito 2, ampliado en Subhito 5B).
  */
 
 export interface IntegrityManifest {
@@ -18,6 +18,7 @@ export interface TypeOpsExportEnvelope {
   exportedAt: string
   contentPacks: ContentPack[]
   settings?: AppSettings
+  mechanicalProfiles?: MechanicalProfileRecord[]
   integrity: IntegrityManifest
 }
 

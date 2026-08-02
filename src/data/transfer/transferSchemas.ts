@@ -14,6 +14,27 @@ export const IntegrityManifestSchema = z
   })
   .strict()
 
+export const SequenceMetricSchema = z
+  .object({
+    totalAppearances: z.number().int().min(0),
+    distinctAttemptsCount: z.number().int().min(0),
+    validLatenciesMs: z.array(z.number().min(0)),
+    medianLatencyMs: z.number().min(0).optional(),
+    hasSufficientSample: z.boolean(),
+  })
+  .strict()
+
+export const MechanicalProfileRecordSchema = z
+  .object({
+    profileKey: z.string().min(1),
+    packId: z.string().min(1),
+    packVersion: z.string().min(1),
+    characterMetrics: z.record(z.string(), SequenceMetricSchema),
+    sequenceMetrics: z.record(z.string(), SequenceMetricSchema),
+    updatedAt: z.string().regex(isoDateRegex, 'updatedAt debe ser fecha ISO 8601'),
+  })
+  .strict()
+
 export const TypeOpsExportEnvelopeSchema = z
   .object({
     format: z.literal('typeops-export', {
@@ -32,6 +53,7 @@ export const TypeOpsExportEnvelopeSchema = z
       })
       .strict()
       .optional(),
+    mechanicalProfiles: z.array(MechanicalProfileRecordSchema).optional(),
     integrity: IntegrityManifestSchema,
   })
   .strict()
@@ -106,6 +128,10 @@ export function loadExportEnvelope(input: unknown): LoadEnvelopeResult {
     exportedAt: rawEnvelope.exportedAt,
     contentPacks: validatedPacks,
     integrity: rawEnvelope.integrity,
+  }
+
+  if (rawEnvelope.mechanicalProfiles !== undefined) {
+    envelope.mechanicalProfiles = rawEnvelope.mechanicalProfiles
   }
 
   if (rawEnvelope.settings !== undefined) {
