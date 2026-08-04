@@ -7,6 +7,7 @@ import type {
   LearningProgressRecord,
   MechanicalProfileRecord,
   GuidedItemProgressRecord,
+  PriorKnowledgeRecord,
 } from './records'
 
 /**
@@ -23,6 +24,7 @@ export class TypeOpsDatabase extends Dexie {
   learningProgress!: Table<LearningProgressRecord, string>
   mechanicalProfiles!: Table<MechanicalProfileRecord, string>
   guidedProgress!: Table<GuidedItemProgressRecord, string>
+  priorKnowledge!: Table<PriorKnowledgeRecord, string>
 
   constructor(databaseName = 'TypeOpsDB') {
     super(databaseName)
@@ -61,6 +63,18 @@ export class TypeOpsDatabase extends Dexie {
       learningProgress: 'compositeUnitKey, unitId, packId, state, nextReviewAt, lastPracticedAt',
       mechanicalProfiles: 'profileKey, packId',
       guidedProgress: 'progressKey, packId, itemId',
+    })
+
+    // Versión 5 del esquema de IndexedDB (Puerta 5D — Prior Knowledge)
+    this.version(5).stores({
+      contentPacks: 'packId, packVersion, schemaVersion, title, checksum',
+      settings: 'key',
+      sessions: 'sessionId, mode, status, startedAt',
+      attempts: 'attemptId, sessionId, itemId, unitId, createdAt',
+      learningProgress: 'compositeUnitKey, unitId, packId, state, nextReviewAt, lastPracticedAt',
+      mechanicalProfiles: 'profileKey, packId',
+      guidedProgress: 'progressKey, packId, itemId',
+      priorKnowledge: 'compositeKey, packId, unitId',
     })
   }
 }

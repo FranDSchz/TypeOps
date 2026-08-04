@@ -1,6 +1,8 @@
 import type { ContentItem, ContentPack, ContentItemMode } from '../content/types'
 import type { LearningProgress } from '../learning/learningState'
 import type { MechanicalProfile } from '../mechanical/mechanicalProfile'
+import type { UnitEligibilityMap } from '../learning/unitEligibility'
+import { checkItemPrerequisites } from '../learning/unitEligibility'
 
 export type RecommendationReasonCode =
   | 'resume_guided'
@@ -31,7 +33,9 @@ export interface RecommendationOptions {
   remainingSecondsBudget?: number
   recentItemIds?: string[]
   progressMap?: Record<string, LearningProgress>
+  unitEligibilityMap?: UnitEligibilityMap
   mechanicalProfile?: MechanicalProfile
+  targetItemId?: string
 }
 
 /**
@@ -40,37 +44,95 @@ export interface RecommendationOptions {
 export function recommendNextItem(
   options: RecommendationOptions,
 ): RecommendationResult | null {
-  const { pack, mode, userFocusCategory, remainingSecondsBudget, recentItemIds = [], progressMap = {} } = options
+  const {
+    pack,
+    mode,
+    userFocusCategory,
+    remainingSecondsBudget,
+    recentItemIds = [],
+    progressMap = {},
+    unitEligibilityMap,
+    targetItemId,
+  } = options
 
-  let eligibleItems = pack.items.filter((item) => {
+  // 1. RESTRICCIONES DURAS (INFRANQUEABLES)
+  const hardEligibleItems = pack.items.filter((item) => {
     if (!item.enabled) return false
     if (item.mode !== mode) return false
 
-    if (remainingSecondsBudget !== undefined && item.estimatedSeconds > remainingSecondsBudget + 30) {
+    if (targetItemId !== undefined && item.itemId !== targetItemId) {
       return false
     }
 
-    if (recentItemIds.slice(-3).includes(item.itemId)) {
-      return false
+    if (unitEligibilityMap) {
+      const prereqCheck = checkItemPrerequisites(item, pack, unitEligibilityMap)
+      if (!prereqCheck.isEligible) {
+        return false
+      }
     }
 
     return true
   })
 
-  if (userFocusCategory) {
-    const focusFiltered = eligibleItems.filter((i) => i.categories.includes(userFocusCategory))
-    if (focusFiltered.length > 0) {
-      eligibleItems = focusFiltered
+  if (hardEligibleItems.length === 0) return null
+
+  // Si se especificó targetItemId y pasó las restricciones duras, es el único candidato
+  if (targetItemId !== undefined) {
+    const targetItem = hardEligibleItems[0]
+    if (!targetItem) return null
+    return {
+      item: targetItem,
+      reasonCode: mode === 'guided' ? 'resume_guided' : 'user_focus',
+      reasonDescription: `Actividad seleccionada explícitamente: '${targetItem.title}'.`,
+      priorityRank: 1,
     }
   }
 
-  if (eligibleItems.length === 0) {
-    eligibleItems = pack.items.filter((item) => item.enabled && item.mode === mode)
+  // 2. RELAJACIÓN ORDENADA DE PREFERENCIAS (Nivel 0: Todas las preferencias aplicadas)
+  let candidates = hardEligibleItems.filter((item) => {
+    if (remainingSecondsBudget !== undefined && item.estimatedSeconds > remainingSecondsBudget + 30) {
+      return false
+    }
+    if (recentItemIds.slice(-3).includes(item.itemId)) {
+      return false
+    }
+    if (userFocusCategory && !item.categories.includes(userFocusCategory)) {
+      return false
+    }
+    return true
+  })
+
+  // Nivel 1 de relajación: Omitir foco por categoría si no hay candidatos
+  if (candidates.length === 0 && userFocusCategory) {
+    candidates = hardEligibleItems.filter((item) => {
+      if (remainingSecondsBudget !== undefined && item.estimatedSeconds > remainingSecondsBudget + 30) {
+        return false
+      }
+      if (recentItemIds.slice(-3).includes(item.itemId)) {
+        return false
+      }
+      return true
+    })
   }
 
-  if (eligibleItems.length === 0) return null
+  // Nivel 2 de relajación: Omitir exclusión de ítems recientes
+  if (candidates.length === 0 && recentItemIds.length > 0) {
+    candidates = hardEligibleItems.filter((item) => {
+      if (remainingSecondsBudget !== undefined && item.estimatedSeconds > remainingSecondsBudget + 30) {
+        return false
+      }
+      return true
+    })
+  }
 
-  for (const item of eligibleItems) {
+  // Nivel 3 de relajación: Omitir presupuesto de tiempo restante
+  if (candidates.length === 0) {
+    candidates = hardEligibleItems
+  }
+
+  if (candidates.length === 0) return null
+
+  for (const item of candidates) {
     if (item.kind === 'guided_practice') {
       const unitProg = item.unitIds[0] ? progressMap[item.unitIds[0]] : undefined
       if (unitProg?.state === 'learning') {
@@ -84,7 +146,7 @@ export function recommendNextItem(
     }
   }
 
-  for (const item of eligibleItems) {
+  for (const item of candidates) {
     if (item.kind === 'guided_practice') {
       const unitProg = item.unitIds[0] ? progressMap[item.unitIds[0]] : undefined
       if (!unitProg || unitProg.state === 'new') {
@@ -98,7 +160,7 @@ export function recommendNextItem(
     }
   }
 
-  for (const item of eligibleItems) {
+  for (const item of candidates) {
     for (const unitId of item.unitIds) {
       const prog = progressMap[unitId]
       if (prog?.state === 'review_due') {
@@ -112,7 +174,7 @@ export function recommendNextItem(
     }
   }
 
-  for (const item of eligibleItems) {
+  for (const item of candidates) {
     for (const unitId of item.unitIds) {
       const prog = progressMap[unitId]
       if (prog?.lastReasonCode === 'CONCEPTUAL_REPAIR_NEEDED') {
@@ -126,7 +188,7 @@ export function recommendNextItem(
     }
   }
 
-  for (const item of eligibleItems) {
+  for (const item of candidates) {
     for (const unitId of item.unitIds) {
       const prog = progressMap[unitId]
       if (prog?.lastReasonCode === 'SYNTAX_REPAIR_NEEDED') {
@@ -140,7 +202,7 @@ export function recommendNextItem(
     }
   }
 
-  const defaultItem = eligibleItems[0]
+  const defaultItem = candidates[0]
   if (!defaultItem) return null
 
   return {

@@ -7,15 +7,18 @@ import { SessionSummaryView } from './SessionSummaryView'
 import { deriveActiveGuidedStage, type GuidedItemProgressRecord } from '../../domain/learning/guidedState'
 import { advanceExpositoryGuidedStage } from '../../data/services/transactionalSessionService'
 import type { TypeOpsDatabase } from '../../data/db/database'
+import type { EvaluationOptions } from '../../domain/evaluation/types'
 
 interface SessionRunnerViewProps {
   state: SessionUIState
-  onSubmitResponse: (responseRaw: unknown, durationMs: number) => void
+  onSubmitResponse: (responseRaw: unknown, durationMs: number, options?: EvaluationOptions) => void
   onUseHint: () => void
+  onAdvanceExpositoryStage?: (stageId: string) => void
   onAdvanceNextItem: () => void
   onFinishSession: () => void
   onExitSession: (saveAsAbandoned?: boolean) => void
   onRetryCloseSession?: () => void
+  onStartTargetGuided?: (targetItemId: string) => void
   db?: TypeOpsDatabase | undefined
 }
 
@@ -23,10 +26,12 @@ export function SessionRunnerView({
   state,
   onSubmitResponse,
   onUseHint,
+  onAdvanceExpositoryStage,
   onAdvanceNextItem,
   onFinishSession,
   onExitSession,
   onRetryCloseSession,
+  onStartTargetGuided,
   db,
 }: SessionRunnerViewProps) {
   const [showExitModal, setShowExitModal] = useState(false)
@@ -47,7 +52,7 @@ export function SessionRunnerView({
     void db.guidedProgress.get(key).then((rec) => {
       setGuidedProgressRecord(rec ?? null)
     })
-  }, [currentItem, db, state.sessionRecord])
+  }, [currentItem, db, state.sessionRecord, state.submittedAttempts, state.status])
 
   // Actualizar inicio de tiempo por ítem cuando cambia el índice
   useEffect(() => {
@@ -109,9 +114,9 @@ export function SessionRunnerView({
     }
   }, [currentItem, state.activeHintLevel, onUseHint])
 
-  function handleFormSubmit(responseRaw: unknown) {
+  function handleFormSubmit(responseRaw: unknown, _?: number, options?: EvaluationOptions) {
     const durationMs = Date.now() - itemStartTime
-    onSubmitResponse(responseRaw, durationMs)
+    onSubmitResponse(responseRaw, durationMs, options)
   }
 
   function handleSkipItem() {
@@ -119,6 +124,10 @@ export function SessionRunnerView({
   }
 
   const handleAdvanceGuidedStage = async (stageId: string) => {
+    if (onAdvanceExpositoryStage) {
+      onAdvanceExpositoryStage(stageId)
+      return
+    }
     if (!db || !state.sessionRecord || !currentItem || currentItem.kind !== 'guided_practice') return
     const res = await advanceExpositoryGuidedStage({
       db,
@@ -131,26 +140,78 @@ export function SessionRunnerView({
     setGuidedProgressRecord(res.guidedProgress)
   }
 
-  const activeStageResult = currentItem?.kind === 'guided_practice' ? deriveActiveGuidedStage(currentItem, guidedProgressRecord) : null
+  const effectiveGuidedProgress = state.guidedProgressRecord ?? guidedProgressRecord
+  const activeStageResult = currentItem?.kind === 'guided_practice' ? deriveActiveGuidedStage(currentItem, effectiveGuidedProgress) : null
   const activeStageId = activeStageResult?.activeStage?.stageId
   const attemptsCountForActiveStage = activeStageId
     ? state.submittedAttempts.filter((a) => a.itemId === currentItem?.itemId && a.guidedStageId === activeStageId).length
     : 0
 
   if (state.status === 'empty_plan') {
+    const compRes = state.compositionResult
     return (
       <div className="session-empty-view" role="region" aria-label="Sin plan de sesión">
         <h2>No hay actividades disponibles</h2>
-        <p>{state.emptyReason ?? 'La configuración seleccionada no produjo candidatos.'}</p>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => {
-            onExitSession(false)
-          }}
-        >
-          Volver al inicio
-        </button>
+
+        {compRes?.status === 'missing_learning_evidence' && (
+          <div className="empty-plan-detail">
+            <p>No podés evaluar este contenido sin haber completado su introducción guiada previa:</p>
+            <ul>
+              {compRes.blockedUnits.map((b) => (
+                <li key={b.unitId}>
+                  <strong>{b.unitTitle}</strong> ({b.requirementType === 'own_unit' ? 'Unidad propia' : 'Prerrequisito'})
+                </li>
+              ))}
+            </ul>
+            {compRes.targetGuidedItemId && onStartTargetGuided && (
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => {
+                  const itemToStart = compRes.targetGuidedItemId
+                  if (itemToStart) {
+                    onStartTargetGuided(itemToStart)
+                  }
+                }}
+              >
+                Iniciar Práctica Guiada de la Unidad
+              </button>
+            )}
+          </div>
+        )}
+
+        {compRes?.status === 'guided_path_unavailable' && (
+          <div className="empty-plan-detail">
+            <p>La siguiente unidad requerida no posee recorrido guiado en este pack:</p>
+            <ul>
+              {compRes.blockedUnits.map((b) => (
+                <li key={b.unitId}>
+                  <strong>{b.unitTitle}</strong> — Podés marcar conocimiento previo si ya conocés este tema.
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {compRes?.status === 'no_content_for_category' && (
+          <p>No hay actividades disponibles en la categoría &apos;{compRes.category}&apos;.</p>
+        )}
+
+        {(!compRes || compRes.status === 'no_eligible_items') && (
+          <p>{state.emptyReason ?? 'La configuración seleccionada no produjo candidatos elegibles.'}</p>
+        )}
+
+        <div className="empty-plan-actions">
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => {
+              onExitSession(false)
+            }}
+          >
+            Volver al inicio
+          </button>
+        </div>
       </div>
     )
   }
@@ -227,7 +288,7 @@ export function SessionRunnerView({
               activeHintLevel={state.activeHintLevel}
               onSubmitResponse={handleFormSubmit}
               onAdvanceGuidedStage={handleAdvanceGuidedStage}
-              guidedProgress={guidedProgressRecord}
+              guidedProgress={effectiveGuidedProgress}
               attemptsCountForActiveStage={attemptsCountForActiveStage}
             />
 

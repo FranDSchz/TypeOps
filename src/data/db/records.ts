@@ -125,3 +125,13 @@ export interface SettingRecord<K extends AppSettingKey = AppSettingKey> {
   updatedAt: string
 }
 
+export interface PriorKnowledgeRecord {
+  /** Clave primaria compuesta `${packId}:${packVersion}:${unitId}` */
+  compositeKey: string
+  packId: string
+  packVersion: string
+  unitId: string
+  source: 'user_configured' | 'pack_imported'
+  updatedAt: string
+}
+

@@ -395,6 +395,7 @@ export const GuidedPracticeItemSchema = z
     kind: z.literal('guided_practice'),
     mode: z.literal('guided'),
     unitId: z.string().min(1, 'unitId no puede estar vacío'),
+    guidedPathId: z.string().optional(),
     stages: z.array(GuidedStageSchema).min(1, 'stages debe tener al menos una etapa'),
     resumePolicy: z.literal('next_incomplete_stage'),
     promotionRule: z.string().min(1, 'promotionRule no puede estar vacía'),

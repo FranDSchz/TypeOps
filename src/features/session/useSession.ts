@@ -1,14 +1,16 @@
 import { useReducer, useCallback, useEffect } from 'react'
 import type { TypeOpsDatabase } from '../../data/db/database'
 import type { ContentItemMode, ContentPack } from '../../domain/content/types'
+import type { MechanicalObservation } from '../../domain/mechanical/mechanicalObservation'
 import { INITIAL_SESSION_UI_STATE, sessionReducer } from './sessionReducer'
 import { createSession, type CreateSessionParams } from './sessionInitializer'
-import { submitAttempt, closeSession } from '../../data/services/transactionalSessionService'
+import { submitAttempt, closeSession, advanceExpositoryGuidedStage } from '../../data/services/transactionalSessionService'
 import { recoverActiveSession } from './sessionRecoveryService'
 import { LearningProgressRepository } from '../../data/repositories/learningProgressRepository'
 import { recommendNextItem } from '../../domain/recommendation/recommendationEngine'
 import type { SessionCompletionReason } from '../../data/db/records'
 import type { LearningProgress } from '../../domain/learning/learningState'
+import { deriveActiveGuidedStage } from '../../domain/learning/guidedState'
 
 export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) {
   const [state, dispatch] = useReducer(sessionReducer, INITIAL_SESSION_UI_STATE)
@@ -33,6 +35,7 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
           sessionRecord: recovery.activeSession,
           sessionPlan: recovery.sessionPlan,
           submittedAttempts: recovery.submittedAttempts,
+          guidedProgress: recovery.guidedProgressRecord ?? null,
         })
       }
     })
@@ -55,7 +58,7 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
       targetDurationSeconds: 300,
     })
 
-    if (result.sessionRecord) {
+    if (result.sessionRecord && result.sessionPlan) {
       dispatch({
         type: 'SESSION_INITIALIZED',
         sessionRecord: result.sessionRecord,
@@ -64,8 +67,7 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
     } else {
       dispatch({
         type: 'SESSION_EMPTY_PLAN',
-        emptyReason: result.emptyReason ?? 'No hay actividades disponibles.',
-        sessionPlan: result.sessionPlan,
+        compositionResult: result.compositionResult,
       })
     }
   }, [db, activePack])
@@ -80,6 +82,7 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
       targetDurationSeconds?: number,
       targetCount?: number,
       userFocusCategory?: string,
+      targetItemId?: string,
     ) => {
       if (!activePack) return
 
@@ -87,20 +90,21 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
       if (targetDurationSeconds !== undefined) createParams.targetDurationSeconds = targetDurationSeconds
       if (targetCount !== undefined) createParams.targetCount = targetCount
       if (userFocusCategory !== undefined) createParams.userFocusCategory = userFocusCategory
+      if (targetItemId !== undefined) createParams.targetItemId = targetItemId
 
       const result = await createSession(createParams)
 
-      if (result.sessionRecord) {
+      if (result.sessionRecord && result.sessionPlan) {
         dispatch({
           type: 'SESSION_INITIALIZED',
           sessionRecord: result.sessionRecord,
           sessionPlan: result.sessionPlan,
+          guidedProgress: result.guidedProgressRecord ?? null,
         })
       } else {
         dispatch({
           type: 'SESSION_EMPTY_PLAN',
-          emptyReason: result.emptyReason ?? 'No hay actividades disponibles.',
-          sessionPlan: result.sessionPlan,
+          compositionResult: result.compositionResult,
         })
       }
     },
@@ -169,7 +173,11 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
   )
 
   const submitResponse = useCallback(
-    async (responseRaw: unknown, durationMs: number) => {
+    async (
+      responseRaw: unknown,
+      durationMs: number,
+      options?: { mechanicalObservation?: MechanicalObservation; guidedStageId?: string },
+    ) => {
       if (!state.sessionRecord || !state.sessionPlan || !state.currentTurnAttemptId || !activePack) return
 
       const currentPlanItem = state.sessionPlan.items[state.currentPlanIndex]
@@ -185,6 +193,8 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
         responseRaw,
         evaluationOptions: {
           hintsUsedCount: state.hintsUsedCount,
+          ...(options?.mechanicalObservation ? { mechanicalObservation: options.mechanicalObservation } : {}),
+          ...(options?.guidedStageId ? { guidedStageId: options.guidedStageId } : {}),
         },
         durationMs,
       })
@@ -193,13 +203,29 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
         type: 'ATTEMPT_SUBMITTED',
         attempt: result.attempt,
         isCompleted: result.isSessionCompleted,
+        guidedProgress: result.guidedProgress ?? null,
       })
     },
     [db, activePack, state.sessionRecord, state.sessionPlan, state.currentPlanIndex, state.currentTurnAttemptId, state.hintsUsedCount],
   )
 
   const advanceNextItem = useCallback(async () => {
-    if (!state.sessionPlan) return
+    if (!state.sessionPlan || !state.sessionRecord || !activePack) return
+
+    const currentItem = state.sessionPlan.items[state.currentPlanIndex]?.item
+
+    if (currentItem?.kind === 'guided_practice') {
+      const key = `${state.sessionRecord.packId}:${state.sessionRecord.packVersion}:${currentItem.itemId}`
+      const dbProgress = await db.guidedProgress.get(key)
+      const effectiveProgress = dbProgress ?? state.guidedProgressRecord
+
+      const activeStageResult = deriveActiveGuidedStage(currentItem, effectiveProgress)
+
+      if (!activeStageResult.isCompleted) {
+        dispatch({ type: 'CONTINUE_CURRENT_ITEM', guidedProgress: effectiveProgress ?? null })
+        return
+      }
+    }
 
     const nextIndex = state.currentPlanIndex + 1
     if (nextIndex >= state.sessionPlan.items.length) {
@@ -207,7 +233,30 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
     } else {
       dispatch({ type: 'ADVANCE_TO_NEXT_ITEM' })
     }
-  }, [state.sessionPlan, state.currentPlanIndex, finishSession])
+  }, [db, activePack, state.sessionPlan, state.sessionRecord, state.currentPlanIndex, state.guidedProgressRecord, finishSession])
+
+  const advanceExpositoryStage = useCallback(
+    async (stageId: string) => {
+      if (!state.sessionRecord || !state.sessionPlan || !activePack) return
+      const currentItem = state.sessionPlan.items[state.currentPlanIndex]?.item
+      if (!currentItem || currentItem.kind !== 'guided_practice') return
+
+      const res = await advanceExpositoryGuidedStage({
+        db,
+        sessionId: state.sessionRecord.sessionId,
+        item: currentItem,
+        packId: activePack.packId,
+        packVersion: activePack.packVersion,
+        stageId,
+      })
+
+      dispatch({
+        type: 'EXPOSITORY_STAGE_ADVANCED',
+        guidedProgress: res.guidedProgress,
+      })
+    },
+    [db, activePack, state.sessionRecord, state.sessionPlan, state.currentPlanIndex],
+  )
 
   const exitSession = useCallback(
     async (saveAsAbandoned = true) => {
@@ -230,6 +279,7 @@ export function useSession(db: TypeOpsDatabase, activePack: ContentPack | null) 
     initSession,
     useHint,
     submitResponse,
+    advanceExpositoryStage,
     advanceNextItem,
     finishSession,
     exitSession,

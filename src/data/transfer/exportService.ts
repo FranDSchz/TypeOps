@@ -62,6 +62,11 @@ export async function exportFullBackup(
     envelope.guidedProgress = guidedRecords
   }
 
+  const pkRecords = await db.priorKnowledge.toArray()
+  if (pkRecords.length > 0) {
+    envelope.priorKnowledge = pkRecords
+  }
+
   if (Object.keys(settings).length > 0) {
     envelope.settings = settings
   }

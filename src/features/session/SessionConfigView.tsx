@@ -1,5 +1,5 @@
 import type { SyntheticEvent } from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ContentItemMode } from '../../domain/content/types'
 
 interface SessionConfigViewProps {
@@ -11,6 +11,9 @@ interface SessionConfigViewProps {
   ) => void
   onCancel: () => void
   categories?: string[]
+  units?: { unitId: string; title: string; summary: string }[]
+  priorKnowledgeUnitIds?: string[]
+  onTogglePriorKnowledge?: (unitId: string, isMarked: boolean) => void
 }
 
 const MODES: { id: ContentItemMode; title: string; desc: string }[] = [
@@ -36,12 +39,24 @@ const MODES: { id: ContentItemMode; title: string; desc: string }[] = [
   },
 ]
 
-export function SessionConfigView({ onStartSession, onCancel, categories = [] }: SessionConfigViewProps) {
+export function SessionConfigView({
+  onStartSession,
+  onCancel,
+  categories = [],
+  units = [],
+  priorKnowledgeUnitIds = [],
+  onTogglePriorKnowledge,
+}: SessionConfigViewProps) {
   const [selectedMode, setSelectedMode] = useState<ContentItemMode>('command')
   const [budgetType, setBudgetType] = useState<'duration' | 'count'>('duration')
   const [durationSeconds, setDurationSeconds] = useState<number>(300)
   const [itemCount, setItemCount] = useState<number>(5)
   const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [markedUnitIds, setMarkedUnitIds] = useState<string[]>(priorKnowledgeUnitIds)
+
+  useEffect(() => {
+    setMarkedUnitIds(priorKnowledgeUnitIds)
+  }, [priorKnowledgeUnitIds])
 
   function handleSubmit(e: SyntheticEvent) {
     e.preventDefault()
@@ -196,6 +211,36 @@ export function SessionConfigView({ onStartSession, onCancel, categories = [] }:
                 </option>
               ))}
             </select>
+          </fieldset>
+        )}
+
+        {units.length > 0 && onTogglePriorKnowledge && (
+          <fieldset className="config-fieldset">
+            <legend className="config-legend">4. Conocimiento previo de unidades (opcional)</legend>
+            <p className="config-help-text">
+              Declarar conocimiento previo de una unidad permite omitir el requisito de su introducción guiada para evaluaciones.
+            </p>
+            <div className="prior-knowledge-list">
+              {units.map((u) => {
+                const isMarked = markedUnitIds.includes(u.unitId)
+                return (
+                  <label key={u.unitId} className="prior-knowledge-item">
+                    <input
+                      type="checkbox"
+                      checked={isMarked}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setMarkedUnitIds((prev) => (checked ? [...prev, u.unitId] : prev.filter((id) => id !== u.unitId)))
+                        onTogglePriorKnowledge(u.unitId, checked)
+                      }}
+                    />
+                    <span>
+                      <strong>{u.title}</strong> — {u.summary}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
           </fieldset>
         )}
 

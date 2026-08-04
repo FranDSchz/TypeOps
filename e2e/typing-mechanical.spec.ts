@@ -1,8 +1,46 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function seedPriorKnowledge(page: Page, unitIds: string[]) {
+  await page.evaluate(async (units) => {
+    return new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('TypeOpsDB')
+      req.onsuccess = () => {
+        const db = req.result
+        const tx = db.transaction(['priorKnowledge'], 'readwrite')
+        const store = tx.objectStore('priorKnowledge')
+        const nowIso = new Date().toISOString()
+        for (const unitId of units) {
+          store.put({
+            compositeKey: `typeops-foundations-es-ar:1.0.0:${unitId}`,
+            packId: 'typeops-foundations-es-ar',
+            packVersion: '1.0.0',
+            unitId,
+            source: 'user_configured',
+            updatedAt: nowIso,
+          })
+        }
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error)
+        }
+      }
+      req.onerror = () => reject(req.error)
+    })
+  }, unitIds)
+  await page.reload()
+}
 
 test.describe('E2E — Typing Mechanical Capture and Persistence (Subhito 5B)', () => {
-  test('inicia sesión de typing, escribe de forma fluida y finaliza con feedback neutro de copia', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/')
+    await seedPriorKnowledge(page, ['unit-linux-basics'])
+  })
+
+  test('inicia sesión de typing, escribe de forma fluida y finaliza con feedback neutro de copia', async ({ page }) => {
 
     // Abrir configuración personalizada
     await page.getByRole('button', { name: 'Configuración personalizada' }).click()
@@ -35,8 +73,6 @@ test.describe('E2E — Typing Mechanical Capture and Persistence (Subhito 5B)', 
   })
 
   test('detecta pegado (paste) en el navegador y presenta aviso informativo', async ({ page }) => {
-    await page.goto('/')
-
     await page.getByRole('button', { name: 'Configuración personalizada' }).click()
     await page.getByText('Typing técnico').click()
     await page.getByLabel('Por cantidad de ejercicios').click()
@@ -65,8 +101,6 @@ test.describe('E2E — Typing Mechanical Capture and Persistence (Subhito 5B)', 
   })
 
   test('recarga con F5 recupera la sesión de typing en curso sin datos parciales', async ({ page }) => {
-    await page.goto('/')
-
     await page.getByRole('button', { name: 'Configuración personalizada' }).click()
     await page.getByText('Typing técnico').click()
     await page.getByLabel('Por cantidad de ejercicios').click()

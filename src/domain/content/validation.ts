@@ -281,16 +281,43 @@ export function validateContentPackCrossReferences(
       }
     })
 
-    if (unit.guidedPathId && !pathIds.has(unit.guidedPathId)) {
-      errors.push(
-        createValidationError({
-          packId: pack.packId,
-          unitId: unit.unitId,
-          path: `units[${uIdxStr}].guidedPathId`,
-          code: 'MISSING_REFERENCE',
-          message: `GuidedPath inexistente: '${unit.guidedPathId}' en unidad '${unit.unitId}'`,
-        }),
-      )
+    if (unit.guidedPathId) {
+      if (!pathIds.has(unit.guidedPathId)) {
+        errors.push(
+          createValidationError({
+            packId: pack.packId,
+            unitId: unit.unitId,
+            path: `units[${uIdxStr}].guidedPathId`,
+            code: 'MISSING_REFERENCE',
+            message: `GuidedPath inexistente: '${unit.guidedPathId}' en unidad '${unit.unitId}'`,
+          }),
+        )
+      } else {
+        const matchingGuidedItems = pack.items.filter(
+          (i) => i.kind === 'guided_practice' && (i.guidedPathId === unit.guidedPathId || i.unitIds.includes(unit.unitId)),
+        )
+        if (matchingGuidedItems.length === 0) {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              unitId: unit.unitId,
+              path: `units[${uIdxStr}].guidedPathId`,
+              code: 'GUIDED_ITEM_MISSING_FOR_PATH',
+              message: `No se encontró un ítem 'guided_practice' ejecutable para el guidedPathId '${unit.guidedPathId}' de la unidad '${unit.unitId}'`,
+            }),
+          )
+        } else if (matchingGuidedItems.length > 1) {
+          errors.push(
+            createValidationError({
+              packId: pack.packId,
+              unitId: unit.unitId,
+              path: `units[${uIdxStr}].guidedPathId`,
+              code: 'DUPLICATE_GUIDED_ITEM_FOR_UNIT',
+              message: `Se encontró más de un ítem 'guided_practice' para el guidedPathId '${unit.guidedPathId}' de la unidad '${unit.unitId}'`,
+            }),
+          )
+        }
+      }
     }
   })
 

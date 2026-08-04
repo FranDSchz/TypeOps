@@ -1,6 +1,6 @@
-import type { AttemptRecord, SessionRecord } from '../../data/db/records'
+import type { AttemptRecord, GuidedItemProgressRecord, SessionRecord } from '../../data/db/records'
 import type { ContentItem } from '../../domain/content/types'
-import type { SessionPlan } from '../../domain/session/sessionComposer'
+import type { SessionCompositionResult, SessionPlan } from '../../domain/session/sessionComposer'
 import type { RecoveryFailureInfo } from './sessionRecoveryService'
 
 export type SessionUIStatus =
@@ -29,9 +29,11 @@ export interface SessionUIState {
   lastSubmittedAttempt: AttemptRecord | null
   submittedAttempts: AttemptRecord[]
   emptyReason: string | null
+  compositionResult: SessionCompositionResult | null
   recoveryError: RecoveryFailureInfo | null
   closeError: string | null
   summaryRecommendation: SummaryRecommendationInfo | null
+  guidedProgressRecord?: GuidedItemProgressRecord | null
 }
 
 export const INITIAL_SESSION_UI_STATE: SessionUIState = {
@@ -45,24 +47,29 @@ export const INITIAL_SESSION_UI_STATE: SessionUIState = {
   lastSubmittedAttempt: null,
   submittedAttempts: [],
   emptyReason: null,
+  compositionResult: null,
   recoveryError: null,
   closeError: null,
   summaryRecommendation: null,
+  guidedProgressRecord: null,
 }
 
 export type SessionAction =
   | { type: 'START_CONFIGURING' }
-  | { type: 'SESSION_INITIALIZED'; sessionRecord: SessionRecord; sessionPlan: SessionPlan }
-  | { type: 'SESSION_EMPTY_PLAN'; emptyReason: string; sessionPlan: SessionPlan }
+  | { type: 'SESSION_INITIALIZED'; sessionRecord: SessionRecord; sessionPlan: SessionPlan; guidedProgress?: GuidedItemProgressRecord | null }
+  | { type: 'SESSION_EMPTY_PLAN'; compositionResult: SessionCompositionResult }
   | {
       type: 'SESSION_RECOVERED'
       sessionRecord: SessionRecord
       sessionPlan: SessionPlan
       submittedAttempts: AttemptRecord[]
+      guidedProgress?: GuidedItemProgressRecord | null
     }
   | { type: 'SESSION_RECOVERY_FAILED'; sessionRecord: SessionRecord | null; recoveryError: RecoveryFailureInfo }
   | { type: 'USE_HINT' }
-  | { type: 'ATTEMPT_SUBMITTED'; attempt: AttemptRecord; isCompleted: boolean }
+  | { type: 'ATTEMPT_SUBMITTED'; attempt: AttemptRecord; isCompleted: boolean; guidedProgress?: GuidedItemProgressRecord | null }
+  | { type: 'CONTINUE_CURRENT_ITEM'; guidedProgress?: GuidedItemProgressRecord | null }
+  | { type: 'EXPOSITORY_STAGE_ADVANCED'; guidedProgress: GuidedItemProgressRecord }
   | { type: 'ADVANCE_TO_NEXT_ITEM' }
   | { type: 'SESSION_COMPLETED'; summaryRecommendation?: SummaryRecommendationInfo | null }
   | { type: 'SESSION_CLOSE_FAILED'; error: string }
@@ -91,14 +98,14 @@ export function sessionReducer(state: SessionUIState, action: SessionAction): Se
         emptyReason: null,
         recoveryError: null,
         closeError: null,
+        guidedProgressRecord: action.guidedProgress ?? null,
       }
 
     case 'SESSION_EMPTY_PLAN':
       return {
         ...state,
         status: 'empty_plan',
-        sessionPlan: action.sessionPlan,
-        emptyReason: action.emptyReason,
+        compositionResult: action.compositionResult,
       }
 
     case 'SESSION_RECOVERED': {
@@ -115,6 +122,7 @@ export function sessionReducer(state: SessionUIState, action: SessionAction): Se
         submittedAttempts: action.submittedAttempts,
         lastSubmittedAttempt: action.submittedAttempts[action.submittedAttempts.length - 1] ?? null,
         recoveryError: null,
+        guidedProgressRecord: action.guidedProgress ?? null,
       }
     }
 
@@ -140,8 +148,25 @@ export function sessionReducer(state: SessionUIState, action: SessionAction): Se
         status: 'item_feedback',
         lastSubmittedAttempt: action.attempt,
         submittedAttempts: updatedAttempts,
+        ...(action.guidedProgress !== undefined ? { guidedProgressRecord: action.guidedProgress } : {}),
       }
     }
+
+    case 'CONTINUE_CURRENT_ITEM':
+      return {
+        ...state,
+        status: 'active',
+        currentTurnAttemptId: crypto.randomUUID(),
+        hintsUsedCount: 0,
+        activeHintLevel: 0,
+        ...(action.guidedProgress !== undefined ? { guidedProgressRecord: action.guidedProgress } : {}),
+      }
+
+    case 'EXPOSITORY_STAGE_ADVANCED':
+      return {
+        ...state,
+        guidedProgressRecord: action.guidedProgress,
+      }
 
     case 'ADVANCE_TO_NEXT_ITEM': {
       if (!state.sessionPlan || !state.sessionRecord) return state

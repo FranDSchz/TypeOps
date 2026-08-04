@@ -19,6 +19,12 @@ test.describe('E2E — Recorrido por teclado de sesión de comando (1 ejercicio)
     const oneExerciseBtn = page.getByRole('button', { name: '1 Ejercicio' })
     await oneExerciseBtn.click()
 
+    // Marcar conocimiento previo para desbloquear la evaluación del comando
+    const checkboxes = await page.locator('input[type="checkbox"]').all()
+    for (const cb of checkboxes) {
+      await cb.click()
+    }
+
     const startBtn = page.getByRole('button', { name: 'Iniciar sesión personalizada' })
     await startBtn.click()
 

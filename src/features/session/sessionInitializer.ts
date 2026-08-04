@@ -1,9 +1,17 @@
 import type { TypeOpsDatabase } from '../../data/db/database'
 import type { SessionPlanItemRecord, SessionRecord } from '../../data/db/records'
 import type { ContentItemMode, ContentPack } from '../../domain/content/types'
-import { composeSession, type SessionComposeOptions, type SessionPlan } from '../../domain/session/sessionComposer'
+import {
+  composeSession,
+  type SessionComposeOptions,
+  type SessionPlan,
+  type SessionCompositionResult,
+} from '../../domain/session/sessionComposer'
 import { LearningProgressRepository } from '../../data/repositories/learningProgressRepository'
+import { PriorKnowledgeRepository } from '../../data/repositories/priorKnowledgeRepository'
 import type { LearningProgress } from '../../domain/learning/learningState'
+import { buildUnitEligibilityMap } from '../../domain/learning/unitEligibility'
+import { deriveActiveGuidedStage, type GuidedItemProgressRecord } from '../../domain/learning/guidedState'
 
 export interface CreateSessionParams {
   db: TypeOpsDatabase
@@ -12,22 +20,24 @@ export interface CreateSessionParams {
   targetDurationSeconds?: number
   targetCount?: number
   userFocusCategory?: string
+  targetItemId?: string
 }
+
 
 export interface CreateSessionResult {
   sessionRecord: SessionRecord | null
-  sessionPlan: SessionPlan
-  emptyReason?: string
+  sessionPlan: SessionPlan | null
+  compositionResult: SessionCompositionResult
+  guidedProgressRecord?: GuidedItemProgressRecord | null
 }
 
 export async function createSession(params: CreateSessionParams): Promise<CreateSessionResult> {
-  const { db, pack, mode, targetDurationSeconds, targetCount, userFocusCategory } = params
+  const { db, pack, mode, targetDurationSeconds, targetCount, userFocusCategory, targetItemId } = params
 
-  // 1. Obtener mapa de progreso para este pack
+  // 1. Obtener progreso conceptual y marcas de conocimiento previo
   const progressRepo = new LearningProgressRepository(db)
   const progressRecordMap = await progressRepo.getAllProgressForPack(pack.packId)
 
-  // Convertir de registros de persistencia a modelo de aprendizaje de dominio
   const progressDomainMap: Record<string, LearningProgress> = {}
   for (const [unitId, record] of Object.entries(progressRecordMap)) {
     const domProg: LearningProgress = {
@@ -42,30 +52,57 @@ export async function createSession(params: CreateSessionParams): Promise<Create
     progressDomainMap[unitId] = domProg
   }
 
+  // 2. Obtener evidencia de guiado completado desde guidedProgress en Dexie
+  const guidedRecords = await db.guidedProgress.where('packId').equals(pack.packId).toArray()
+  const completedGuidedItemIds: string[] = []
+
+  for (const gRec of guidedRecords) {
+    const guidedItem = pack.items.find((i) => i.itemId === gRec.itemId && i.kind === 'guided_practice')
+    if (guidedItem && guidedItem.kind === 'guided_practice') {
+      const activeStage = deriveActiveGuidedStage(guidedItem, gRec)
+      if (activeStage.isCompleted) {
+        completedGuidedItemIds.push(guidedItem.itemId)
+      }
+    }
+  }
+
+  // 3. Obtener marcas de conocimiento previo desde priorKnowledge
+  const pkRepo = new PriorKnowledgeRepository(db)
+  const pkRecords = await pkRepo.getAllForPack(pack.packId, pack.packVersion)
+  const priorKnowledgeUnitIds = pkRecords.map((r) => r.unitId)
+
+  // 4. Derivar mapa de elegibilidad de dominio puro
+  const unitEligibilityMap = buildUnitEligibilityMap({
+    pack,
+    completedGuidedItemIds,
+    priorKnowledgeUnitIds,
+  })
+
   const composeOpts: SessionComposeOptions = {
     pack,
     mode,
     progressMap: progressDomainMap,
+    unitEligibilityMap,
   }
   if (targetDurationSeconds !== undefined) composeOpts.targetDurationSeconds = targetDurationSeconds
   if (targetCount !== undefined) composeOpts.targetCount = targetCount
   if (userFocusCategory !== undefined) composeOpts.userFocusCategory = userFocusCategory
+  if (targetItemId !== undefined) composeOpts.targetItemId = targetItemId
 
-  // 2. Componer la sesión usando el dominio existente
-  const sessionPlan = composeSession(composeOpts)
+  // 5. Componer la sesión
+  const compositionResult = composeSession(composeOpts)
 
-  // 3. Si no hay candidatos, devolver resultado explicativo sin alterar dominio
-  if (sessionPlan.items.length === 0) {
+  if (compositionResult.status !== 'success') {
     return {
       sessionRecord: null,
-      sessionPlan,
-      emptyReason: userFocusCategory
-        ? `No hay ejercicios disponibles en la categoría '${userFocusCategory}' para el modo seleccionado.`
-        : 'No hay ejercicios disponibles en el pack para esta configuración.',
+      sessionPlan: null,
+      compositionResult,
     }
   }
 
-  // 4. Crear registro de sesión persistible
+  const sessionPlan = compositionResult.sessionPlan
+
+  // 6. Crear registro de sesión persistible ÚNICAMENTE cuando status es 'success'
   const sessionId = crypto.randomUUID()
   const now = new Date()
   const nowIso = now.toISOString()
@@ -98,7 +135,7 @@ export async function createSession(params: CreateSessionParams): Promise<Create
     sessionRecord.userFocusCategory = userFocusCategory
   }
 
-  // 5. Persistir sesión y fijar activeSessionId atómicamente
+  // Persistir sesión y fijar activeSessionId atómicamente
   await db.transaction('rw', [db.sessions, db.settings], async () => {
     await db.sessions.put(sessionRecord)
     await db.settings.put({
@@ -108,8 +145,17 @@ export async function createSession(params: CreateSessionParams): Promise<Create
     })
   })
 
+  const firstItem = sessionPlan.items[0]?.item
+  let guidedProgressRecord: GuidedItemProgressRecord | null = null
+  if (firstItem?.kind === 'guided_practice') {
+    const key = `${pack.packId}:${pack.packVersion}:${firstItem.itemId}`
+    guidedProgressRecord = (await db.guidedProgress.get(key)) ?? null
+  }
+
   return {
     sessionRecord,
     sessionPlan,
+    compositionResult,
+    guidedProgressRecord,
   }
 }

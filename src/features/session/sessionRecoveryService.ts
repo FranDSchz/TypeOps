@@ -12,10 +12,13 @@ export interface RecoveryFailureInfo {
   missingItemIds?: string[]
 }
 
+import type { GuidedItemProgressRecord } from '../../domain/learning/guidedState'
+
 export interface SessionRecoveryResult {
   activeSession: SessionRecord | null
   sessionPlan: SessionPlan | null
   submittedAttempts: AttemptRecord[]
+  guidedProgressRecord?: GuidedItemProgressRecord | null
   recoveryError: RecoveryFailureInfo | null
 }
 
@@ -113,10 +116,18 @@ export async function recoverActiveSession(
   const attemptRepo = new AttemptRepository(db)
   const submittedAttempts = await attemptRepo.getAttemptsBySessionId(sessionRecord.sessionId)
 
+  const currentItem = sessionPlan.items[sessionRecord.currentIndex]?.item
+  let guidedProgressRecord: GuidedItemProgressRecord | null = null
+  if (currentItem?.kind === 'guided_practice') {
+    const key = `${sessionRecord.packId}:${sessionRecord.packVersion}:${currentItem.itemId}`
+    guidedProgressRecord = (await db.guidedProgress.get(key)) ?? null
+  }
+
   return {
     activeSession: sessionRecord,
     sessionPlan,
     submittedAttempts,
+    guidedProgressRecord,
     recoveryError: null,
   }
 }

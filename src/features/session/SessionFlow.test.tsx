@@ -86,8 +86,24 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
   let testDb: TypeOpsDatabase
   const pack = officialPack as ContentPack
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDb = createTestDatabase()
+    await testDb.priorKnowledge.put({
+      compositeKey: `${pack.packId}:${pack.packVersion}:unit-log-inspection`,
+      packId: pack.packId,
+      packVersion: pack.packVersion,
+      unitId: 'unit-log-inspection',
+      source: 'user_configured',
+      updatedAt: new Date().toISOString(),
+    })
+    await testDb.priorKnowledge.put({
+      compositeKey: `${pack.packId}:${pack.packVersion}:unit-linux-basics`,
+      packId: pack.packId,
+      packVersion: pack.packVersion,
+      unitId: 'unit-linux-basics',
+      source: 'user_configured',
+      updatedAt: new Date().toISOString(),
+    })
   })
 
   afterEach(() => {
@@ -283,6 +299,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
         lastSubmittedAttempt: null,
         submittedAttempts: [],
         emptyReason: null,
+        compositionResult: null,
         recoveryError: null,
         closeError: null,
         summaryRecommendation: null,
@@ -319,6 +336,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
         lastSubmittedAttempt: null,
         submittedAttempts: [],
         emptyReason: null,
+        compositionResult: null,
         recoveryError: null,
         closeError: null,
         summaryRecommendation: null,
@@ -356,6 +374,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
         lastSubmittedAttempt: null,
         submittedAttempts: [],
         emptyReason: null,
+        compositionResult: null,
         recoveryError: null,
         closeError: null,
         summaryRecommendation: null,
@@ -410,6 +429,7 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
         lastSubmittedAttempt: null,
         submittedAttempts: [],
         emptyReason: null,
+        compositionResult: null,
         recoveryError: null,
         closeError: null,
         summaryRecommendation: null,
@@ -759,6 +779,51 @@ describe('Session UI Flow (Paso 4 - RTL & Observaciones Hito 4)', () => {
       expect(screen.getByText('Respondidos')).toBeInTheDocument()
       expect(screen.getByText('Pendientes de revisión')).toBeInTheDocument()
       expect(screen.getByText('Omitidos')).toBeInTheDocument()
+    })
+  })
+
+  describe('Flujo R1E — guided_path_unavailable al requerir unidad sin recorrido guiado', () => {
+    it('muestra guided_path_unavailable con la explicación para unit-linux-basics al intentar modo command tras guided-tail-intro', async () => {
+      const user = userEvent.setup()
+
+      // Asegurar que unit-linux-basics no tenga marca de conocimiento previo
+      await testDb.priorKnowledge.delete(`${pack.packId}:${pack.packVersion}:unit-linux-basics`)
+
+      // Guiado completado para unit-log-inspection
+      await testDb.guidedProgress.put({
+        progressKey: `${pack.packId}:${pack.packVersion}:guided-tail-intro`,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        itemId: 'guided-tail-intro',
+        completedStageIds: ['stg-1', 'stg-2', 'stg-3', 'stg-4', 'stg-5'],
+        updatedAt: new Date().toISOString(),
+      })
+
+      render(<TestSessionApp db={testDb} pack={pack} />)
+
+      // Seleccionar modo comando desde la configuración personalizada
+      await user.click(screen.getByRole('button', { name: 'Configuración personalizada' }))
+      await user.click(screen.getByText('Comando desde intención'))
+      const submitConfigBtn = screen.getByRole('button', { name: 'Iniciar sesión personalizada' })
+      await user.click(submitConfigBtn)
+
+      // Debe mostrar la región "Sin plan de sesión"
+      const emptyView = await screen.findByRole('region', { name: /Sin plan de sesión/i })
+      expect(emptyView).toBeInTheDocument()
+
+      // Debe explicar que unit-linux-basics no posee recorrido guiado
+      expect(screen.getByText(/La siguiente unidad requerida no posee recorrido guiado en este pack/i)).toBeInTheDocument()
+      expect(screen.getByText(/Fundamentos de Shell Linux/i)).toBeInTheDocument()
+
+      // No debe ofrecer botón para iniciar guiado inexistente
+      expect(screen.queryByRole('button', { name: /Iniciar Práctica Guiada/i })).not.toBeInTheDocument()
+
+      // Debe existir el botón de retorno
+      expect(screen.getByRole('button', { name: /Volver al inicio/i })).toBeInTheDocument()
+
+      // No se crearon intentos en la DB
+      const attemptsCount = await testDb.attempts.count()
+      expect(attemptsCount).toBe(0)
     })
   })
 })

@@ -288,6 +288,7 @@ export interface GuidedPracticeItem extends BaseContentItem {
   kind: 'guided_practice'
   mode: 'guided'
   unitId: string
+  guidedPathId?: string
   stages: GuidedStage[]
   resumePolicy: 'next_incomplete_stage'
   promotionRule: string

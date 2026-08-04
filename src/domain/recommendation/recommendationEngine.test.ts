@@ -53,4 +53,59 @@ describe('Recommendation Engine (Hito 3)', () => {
     expect(rec).not.toBeNull()
     expect(rec?.item.categories).toContain('linux')
   })
+
+  it('bloquea ítem de evaluación si la unidad requerida no es elegible en unitEligibilityMap', () => {
+    const rec = recommendNextItem({
+      pack,
+      mode: 'command',
+      unitEligibilityMap: {
+        'unit-log-inspection': {
+          unitId: 'unit-log-inspection',
+          hasGuidedPathInPack: true,
+          isGuidedCompleted: false,
+          hasPriorKnowledge: false,
+          isSatisfiedForEvaluation: false,
+          isSatisfiedForGuidedEntry: false,
+        },
+        'unit-linux-basics': {
+          unitId: 'unit-linux-basics',
+          hasGuidedPathInPack: false,
+          isGuidedCompleted: false,
+          hasPriorKnowledge: true,
+          isSatisfiedForEvaluation: true,
+          isSatisfiedForGuidedEntry: true,
+        },
+      },
+    })
+
+    expect(rec).toBeNull()
+  })
+
+  it('permite ítem de evaluación cuando sus unidades requeridas están satisfechas', () => {
+    const rec = recommendNextItem({
+      pack,
+      mode: 'command',
+      unitEligibilityMap: {
+        'unit-log-inspection': {
+          unitId: 'unit-log-inspection',
+          hasGuidedPathInPack: true,
+          isGuidedCompleted: true,
+          hasPriorKnowledge: false,
+          isSatisfiedForEvaluation: true,
+          isSatisfiedForGuidedEntry: true,
+        },
+        'unit-linux-basics': {
+          unitId: 'unit-linux-basics',
+          hasGuidedPathInPack: false,
+          isGuidedCompleted: false,
+          hasPriorKnowledge: true,
+          isSatisfiedForEvaluation: true,
+          isSatisfiedForGuidedEntry: true,
+        },
+      },
+    })
+
+    expect(rec).not.toBeNull()
+    expect(rec?.item.itemId).toBe('cmd-tail-n')
+  })
 })

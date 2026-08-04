@@ -221,7 +221,7 @@ export async function confirmImport(
     }
 
     try {
-      await db.transaction('rw', [db.contentPacks, db.settings, db.mechanicalProfiles, db.guidedProgress], async () => {
+      await db.transaction('rw', [db.contentPacks, db.settings, db.mechanicalProfiles, db.guidedProgress, db.priorKnowledge], async () => {
         for (const record of recordsToStore) {
           await db.contentPacks.put(record)
         }
@@ -238,6 +238,14 @@ export async function confirmImport(
           for (const guidedRec of envelope.guidedProgress) {
             if (guidedRec.progressKey && guidedRec.packId) {
               await db.guidedProgress.put(guidedRec)
+            }
+          }
+        }
+
+        if (Array.isArray(envelope.priorKnowledge)) {
+          for (const pkRec of envelope.priorKnowledge) {
+            if (pkRec.compositeKey && pkRec.packId && pkRec.unitId) {
+              await db.priorKnowledge.put(pkRec)
             }
           }
         }

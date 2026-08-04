@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DevStoragePanel } from './DevStoragePanel'
 import { db } from '../data/db/database'
 import officialPack from '../content/typeops-foundations-es-ar/pack.json'
@@ -7,6 +7,7 @@ import type { ContentItemMode, ContentPack } from '../domain/content/types'
 import { useSession } from '../features/session/useSession'
 import { SessionConfigView } from '../features/session/SessionConfigView'
 import { SessionRunnerView } from '../features/session/SessionRunnerView'
+import { PriorKnowledgeRepository } from '../data/repositories/priorKnowledgeRepository'
 import './App.css'
 
 interface ModeDefinition {
@@ -45,6 +46,14 @@ const MODES: ModeDefinition[] = [
 
 export function App() {
   const [pack, setPack] = useState<ContentPack | null>(null)
+  const [priorKnowledgeUnitIds, setPriorKnowledgeUnitIds] = useState<string[]>([])
+
+  const refreshPriorKnowledge = useCallback(async () => {
+    if (!pack) return
+    const pkRepo = new PriorKnowledgeRepository(db)
+    const records = await pkRepo.getAllForPack(pack.packId, pack.packVersion)
+    setPriorKnowledgeUnitIds(records.map((r) => r.unitId))
+  }, [pack])
 
   useEffect(() => {
     const loaded = loadContentPack(officialPack)
@@ -52,6 +61,23 @@ export function App() {
       setPack(loaded.pack)
     }
   }, [])
+
+  useEffect(() => {
+    if (pack) {
+      refreshPriorKnowledge().catch(console.error)
+    }
+  }, [pack, refreshPriorKnowledge])
+
+  const handleTogglePriorKnowledge = async (unitId: string, isMarked: boolean) => {
+    if (!pack) return
+    const pkRepo = new PriorKnowledgeRepository(db)
+    if (isMarked) {
+      await pkRepo.markPriorKnowledge(pack.packId, pack.packVersion, unitId)
+    } else {
+      await pkRepo.unmarkPriorKnowledge(pack.packId, pack.packVersion, unitId)
+    }
+    await refreshPriorKnowledge()
+  }
 
   const {
     state,
@@ -61,6 +87,7 @@ export function App() {
     useHint,
     submitResponse,
     advanceNextItem,
+    advanceExpositoryStage,
     finishSession,
     exitSession,
   } = useSession(db, pack)
@@ -74,7 +101,7 @@ export function App() {
       <header className="app-header" role="banner">
         <span className="app-logo" aria-label="TypeOps">
           TypeOps
-          <span className="app-logo-sub" aria-hidden="true">v1 (Hito 4)</span>
+          <span className="app-logo-sub" aria-hidden="true">V1</span>
         </span>
       </header>
 
@@ -143,6 +170,11 @@ export function App() {
         {state.status === 'configuring' && (
           <SessionConfigView
             categories={pack ? Array.from(new Set(pack.items.flatMap((i) => i.categories))) : []}
+            units={pack ? pack.units.map((u) => ({ unitId: u.unitId, title: u.title, summary: u.summary })) : []}
+            priorKnowledgeUnitIds={priorKnowledgeUnitIds}
+            onTogglePriorKnowledge={(unitId, isMarked) => {
+              void handleTogglePriorKnowledge(unitId, isMarked)
+            }}
             onStartSession={(mode, targetDurationSeconds, targetCount, userFocusCategory) => {
               void initSession(mode, targetDurationSeconds, targetCount, userFocusCategory)
             }}
@@ -160,6 +192,9 @@ export function App() {
               void submitResponse(responseRaw, durationMs)
             }}
             onUseHint={useHint}
+            onAdvanceExpositoryStage={(stageId) => {
+              void advanceExpositoryStage(stageId)
+            }}
             onAdvanceNextItem={() => {
               void advanceNextItem()
             }}
@@ -168,6 +203,9 @@ export function App() {
             }}
             onExitSession={(saveAsAbandoned) => {
               void exitSession(saveAsAbandoned)
+            }}
+            onStartTargetGuided={(targetItemId) => {
+              void initSession('guided', 300, undefined, undefined, targetItemId)
             }}
           />
         )}

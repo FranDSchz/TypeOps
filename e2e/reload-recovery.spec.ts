@@ -1,8 +1,43 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function seedPriorKnowledge(page: Page, unitIds: string[]) {
+  await page.evaluate(async (units) => {
+    return new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('TypeOpsDB')
+      req.onsuccess = () => {
+        const db = req.result
+        const tx = db.transaction(['priorKnowledge'], 'readwrite')
+        const store = tx.objectStore('priorKnowledge')
+        const nowIso = new Date().toISOString()
+        for (const unitId of units) {
+          store.put({
+            compositeKey: `typeops-foundations-es-ar:1.0.0:${unitId}`,
+            packId: 'typeops-foundations-es-ar',
+            packVersion: '1.0.0',
+            unitId,
+            source: 'user_configured',
+            updatedAt: nowIso,
+          })
+        }
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error)
+        }
+      }
+      req.onerror = () => reject(req.error)
+    })
+  }, unitIds)
+  await page.reload()
+}
 
 test.describe('E2E — Recuperación de sesión activa tras recarga (F5)', () => {
   test('recupera exactamente la sesión activa y presenta el segundo ítem del plan tras recargar', async ({ page }) => {
     await page.goto('/')
+    await seedPriorKnowledge(page, ['unit-linux-basics', 'unit-log-inspection'])
 
     // 1. Abrir configuración personalizada
     const configBtn = page.getByRole('button', { name: 'Configuración personalizada' })

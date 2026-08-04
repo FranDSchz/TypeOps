@@ -405,6 +405,7 @@
       "kind": "guided_practice",
       "mode": "guided",
       "unitId": "unit-log-inspection",
+      "guidedPathId": "gp-tail-command",
       "unitIds": ["unit-log-inspection"],
       "title": "Práctica guiada: Uso de tail para logs",
       "context": "Primera aproximación a la inspección de archivos de registro.",

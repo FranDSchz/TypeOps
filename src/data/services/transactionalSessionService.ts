@@ -31,6 +31,7 @@ export interface SubmitAttemptResult {
   attempt: AttemptRecord
   evaluationResult: EvaluationResult
   isSessionCompleted: boolean
+  guidedProgress?: GuidedItemProgressRecord
 }
 
 export interface AdvanceExpositoryStageOptions {
@@ -313,6 +314,7 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
     const compositeUnitKey = `${packId}:${unitId}`
     const currentProgressRecord = await db.learningProgress.get(compositeUnitKey)
     let shouldAdvanceSession = true
+    let updatedGuidedProgressRecord: GuidedItemProgressRecord | undefined = undefined
 
     if (isSkipped && item.kind !== 'guided_practice') {
       // Omisión de otros ítems NO crea progreso
@@ -364,8 +366,22 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
       }
 
       let updatedCompleted = currentCompleted
-      if (stageCompleted && !currentCompleted.includes(guidedStageId)) {
-        updatedCompleted = [...currentCompleted, guidedStageId]
+      const stageIdx = item.stages.findIndex((s) => s.stageId === guidedStageId)
+      if (stageIdx > 0) {
+        const priorExpositoryIds = item.stages
+          .slice(0, stageIdx)
+          .filter(
+            (s) =>
+              s.stageType !== 'guided_exercise' &&
+              s.stageType !== 'unassisted_exercise' &&
+              s.stageType !== 'later_variant',
+          )
+          .map((s) => s.stageId)
+        updatedCompleted = Array.from(new Set([...updatedCompleted, ...priorExpositoryIds]))
+      }
+
+      if (stageCompleted && !updatedCompleted.includes(guidedStageId)) {
+        updatedCompleted = [...updatedCompleted, guidedStageId]
       }
 
       const updatedGuidedProgress: GuidedItemProgressRecord = {
@@ -376,6 +392,7 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
         completedStageIds: updatedCompleted,
         updatedAt: nowIso,
       }
+      updatedGuidedProgressRecord = updatedGuidedProgress
       await db.guidedProgress.put(updatedGuidedProgress)
 
       const nextLearningProgress = computeNextGuidedLearningState(
@@ -501,6 +518,7 @@ export async function submitAttempt(options: SubmitAttemptOptions): Promise<Subm
       attempt: attemptRecord,
       evaluationResult,
       isSessionCompleted,
+      ...(updatedGuidedProgressRecord ? { guidedProgress: updatedGuidedProgressRecord } : {}),
     }
   })
 }

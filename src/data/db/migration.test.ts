@@ -341,4 +341,27 @@ class V2Database extends Dexie {
       }
     }
   })
+
+  it('migra una base v4 a v5 preservando registros e instanciando la tabla priorKnowledge (Puerta 5D)', async () => {
+    const dbName = `TypeOpsDB_Migration_V4_V5_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`
+    const dbV5 = new TypeOpsDatabase(dbName)
+    try {
+      expect(dbV5.priorKnowledge).toBeDefined()
+      await dbV5.priorKnowledge.put({
+        compositeKey: 'typeops-foundations-es-ar:1.0.0:unit-linux-basics',
+        packId: 'typeops-foundations-es-ar',
+        packVersion: '1.0.0',
+        unitId: 'unit-linux-basics',
+        source: 'user_configured',
+        updatedAt: new Date().toISOString(),
+      })
+
+      const pkRec = await dbV5.priorKnowledge.get('typeops-foundations-es-ar:1.0.0:unit-linux-basics')
+      expect(pkRec?.unitId).toBe('unit-linux-basics')
+      expect(pkRec?.source).toBe('user_configured')
+    } finally {
+      dbV5.close()
+      await dbV5.delete()
+    }
+  })
 })

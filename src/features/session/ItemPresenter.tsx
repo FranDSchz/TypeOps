@@ -61,6 +61,17 @@ export function ItemPresenter({
   }, [item, guidedProgress])
 
   const activeStage = activeStageResult?.activeStage
+  const activeStageId = activeStage?.stageId
+
+  useEffect(() => {
+    setTextInput('')
+    setSingleChoiceId('')
+    setMultipleChoiceIds([])
+    setOpenText('')
+    setSelectedDecisionChoiceId('')
+    setSelectedEvidenceIds([])
+    setValidationError(null)
+  }, [item.itemId, activeStageId])
 
   // Ocultar pistas si la etapa activa es unassisted_exercise (Mandato 6)
   const isUnassistedStage = activeStage?.stageType === 'unassisted_exercise'

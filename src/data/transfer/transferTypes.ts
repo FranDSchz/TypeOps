@@ -1,5 +1,5 @@
 import type { ContentPack, ContentValidationError } from '../../domain/content/types'
-import type { AppSettings, MechanicalProfileRecord, GuidedItemProgressRecord } from '../db/records'
+import type { AppSettings, MechanicalProfileRecord, GuidedItemProgressRecord, PriorKnowledgeRecord } from '../db/records'
 
 /**
  * Sobres de exportación e intercambio de datos (Hito 2, ampliado en Subhito 5B y 5C).
@@ -20,6 +20,7 @@ export interface TypeOpsExportEnvelope {
   settings?: AppSettings
   mechanicalProfiles?: MechanicalProfileRecord[]
   guidedProgress?: GuidedItemProgressRecord[]
+  priorKnowledge?: PriorKnowledgeRecord[]
   integrity: IntegrityManifest
 }
 
